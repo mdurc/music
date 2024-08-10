@@ -4,13 +4,34 @@
 #define MINIAUDIO_IMPLEMENTATION
 #include "libs/miniaudio.h"
 
+
 typedef struct {
     float duration;
     char title[128];
     char artist[128];
 } meta_data;
 
+void parse_sound(ma_sound* sound, meta_data* meta) {
+    ma_sound_get_length_in_seconds(sound, &meta->duration);
+    snprintf(meta->title, sizeof(meta->title), "Unknown Title");
+    snprintf(meta->artist, sizeof(meta->artist), "Unknown Artist");
+}
+
 int main(){
+
+    const int WIDTH = 800;
+    const int HEIGHT = 450;
+    float current_time, new_time, progress;
+    bool play_btn_hover = 0;
+    bool playing = 0; // there is ma_sound_is_playing(&sound);
+
+    Vector2 mouse_pos;
+
+    Rectangle playback_line = { 100, HEIGHT - 50, WIDTH - 200, 10 };
+    Rectangle play_btn = { WIDTH/2.0 - 50, HEIGHT/2.0 - 25, 100, 50 };
+
+    meta_data meta;
+
     //  =======
     // MINIAUDIO_IMPLEMENTATION
     ma_result result;
@@ -24,29 +45,33 @@ int main(){
 
     //  =======
 
-    const int WIDTH = 800;
-    const int HEIGHT = 450;
 
     SetTraceLogLevel(LOG_ERROR); // Hide logs in raylib init to console
     InitWindow(WIDTH, HEIGHT, "Rythme");
     SetTargetFPS(60);
 
-    Rectangle play_btn = { WIDTH/2.0 - 50, HEIGHT/2.0 - 25, 100, 50 };
-    bool play_btn_hover = 0;
-    bool playing = 0;
+    parse_sound(&sound, &meta);
 
-    while(!WindowShouldClose()){
-        Vector2 mouse_pos = GetMousePosition();
+    while (!WindowShouldClose()) {
+        mouse_pos = GetMousePosition();
         play_btn_hover = CheckCollisionPointRec(mouse_pos, play_btn);
 
         if (play_btn_hover && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-            if(!playing){
+            if (!playing) {
                 ma_sound_start(&sound);
-            }else{
+            } else {
                 ma_sound_stop(&sound);
             }
             playing = !playing;
         }
+
+        if (CheckCollisionPointRec(mouse_pos, playback_line) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            new_time = (mouse_pos.x - playback_line.x) / playback_line.width * meta.duration;
+            ma_sound_seek_to_pcm_frame(&sound, new_time*engine.sampleRate);
+        }
+
+        ma_sound_get_cursor_in_seconds(&sound, &current_time);
+        progress = current_time / meta.duration;
 
         BeginDrawing();
         ClearBackground(RAYWHITE);
@@ -57,7 +82,14 @@ int main(){
             DrawRectangleRec(play_btn, GRAY);
         }
         
-        DrawText("Play", play_btn.x + 25, play_btn.y + 15, 20, BLACK);
+        DrawText(!playing? "Play": "Pause", play_btn.x + 25, play_btn.y + 15, 20, BLACK);
+
+        DrawRectangleRec(playback_line, DARKGRAY);
+        DrawRectangle(playback_line.x, playback_line.y - 5, playback_line.width * progress, playback_line.height + 10, SKYBLUE);
+
+        DrawText(TextFormat("Title: %s", meta.title), 10, 10, 20, BLACK);
+        DrawText(TextFormat("Artist: %s", meta.artist), 10, 40, 20, BLACK);
+        DrawText(TextFormat("Time: %.2f / %.2f", current_time, meta.duration), 10, 70, 20, BLACK);
 
         EndDrawing();
     }
