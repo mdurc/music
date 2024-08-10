@@ -1,5 +1,7 @@
 
 #include <raylib.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #define MINIAUDIO_IMPLEMENTATION
 #include "libs/miniaudio.h"
@@ -17,13 +19,18 @@ void parse_sound(ma_sound* sound, meta_data* meta) {
     snprintf(meta->artist, sizeof(meta->artist), "Unknown Artist");
 }
 
-int main(){
+int main(int argc, char** argv){
+    if(argc<2){
+        fprintf(stderr, "Usage: ./a.out <song>\n");
+        exit(EXIT_FAILURE);
+    }
 
     const int WIDTH = 800;
     const int HEIGHT = 450;
     float current_time, new_time, progress;
     bool play_btn_hover = 0;
     bool playing = 0; // there is ma_sound_is_playing(&sound);
+    bool dragging_scrubber = 0;
 
     Vector2 mouse_pos;
 
@@ -39,9 +46,15 @@ int main(){
     ma_sound sound;
 
     result = ma_engine_init(NULL, &engine);
-    if (result != MA_SUCCESS) { return result; }
-    result = ma_sound_init_from_file(&engine, "song.mp3", 0, NULL, NULL, &sound);
-    if (result != MA_SUCCESS) { return result; }
+    if (result != MA_SUCCESS) { 
+        fprintf(stderr, "Engine failed");
+        exit(EXIT_FAILURE);
+     }
+    result = ma_sound_init_from_file(&engine, argv[1], 0, NULL, NULL, &sound);
+    if (result != MA_SUCCESS) { 
+        fprintf(stderr, "Sound failed\n");
+        exit(EXIT_FAILURE);
+     }
 
     //  =======
 
@@ -65,9 +78,16 @@ int main(){
             playing = !playing;
         }
 
-        if (CheckCollisionPointRec(mouse_pos, playback_line) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        if (dragging_scrubber || (CheckCollisionPointRec(mouse_pos, playback_line) &&
+                                  IsMouseButtonPressed(MOUSE_LEFT_BUTTON))) {
+            if(ma_sound_is_playing(&sound)) ma_sound_stop(&sound);
             new_time = (mouse_pos.x - playback_line.x) / playback_line.width * meta.duration;
-            ma_sound_seek_to_pcm_frame(&sound, new_time*engine.sampleRate);
+            ma_sound_seek_to_pcm_frame(&sound, fmin(new_time*engine.sampleRate, meta.duration*engine.sampleRate));
+            dragging_scrubber = 1;
+        }
+        if ( dragging_scrubber && IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
+            dragging_scrubber = 0;
+            if(playing) ma_sound_start(&sound);
         }
 
         ma_sound_get_cursor_in_seconds(&sound, &current_time);
