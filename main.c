@@ -53,16 +53,16 @@ void parse_sound(const char* filepath, sound_meta* sound, ma_engine* engine) {
 
 
 // TODO: Hashtable of songs by artist
-bool btn_pressed(Vector2* mouse_pos, Rectangle* btn){
-    return CheckCollisionPointRec(*mouse_pos, *btn) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
+bool btn_pressed(Vector2 mouse_pos, Rectangle* btn){
+    return CheckCollisionPointRec(mouse_pos, *btn) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
 }
 
 
-void draw_scrub_player(Vector2* mouse_pos, Vector2 play_btn_center, float play_btn_radius, Rectangle* playback_line, float progress, bool playing, sound_meta* sound){
+void draw_scrub_player(Vector2 mouse_pos, Vector2 play_btn_center, float play_btn_radius, Rectangle* playback_line, float progress, bool playing, sound_meta* sound){
     char time_stamps[10];
     char* play_text;
     Vector2 text_size;
-    if(CheckCollisionPointCircle(*mouse_pos, play_btn_center, play_btn_radius)){
+    if(CheckCollisionPointCircle(mouse_pos, play_btn_center, play_btn_radius)){
         DrawCircleV(play_btn_center, play_btn_radius, LIGHTGRAY);
     }else{
         DrawCircleV(play_btn_center, play_btn_radius, GRAY);
@@ -89,8 +89,8 @@ void draw_scrub_player(Vector2* mouse_pos, Vector2 play_btn_center, float play_b
     DrawTextEx(font, TextFormat("%s", sound->mod_date), (Vector2){playback_line->width-20, playback_line->y-30}, 20, 1, WHITE);
 }
 
-void check_play_btn_pressed(Vector2* mouse_pos, Vector2 play_btn_center, float play_btn_radius, bool* playing, ma_sound* aud){
-    if(CheckCollisionPointCircle(*mouse_pos, play_btn_center, play_btn_radius) &&
+void check_play_btn_pressed(Vector2 mouse_pos, Vector2 play_btn_center, float play_btn_radius, bool* playing, ma_sound* aud){
+    if(CheckCollisionPointCircle(mouse_pos, play_btn_center, play_btn_radius) &&
             IsMouseButtonPressed(MOUSE_LEFT_BUTTON)){
         if (!(*playing)) {
             ma_sound_start(aud);
@@ -101,12 +101,13 @@ void check_play_btn_pressed(Vector2* mouse_pos, Vector2 play_btn_center, float p
     }
 }
 
-void check_adjust_scrubber(Vector2* mouse_pos, Rectangle* playback_line, bool* dragging_scrubber,
-            bool playing, sound_meta* sound, float* new_time, unsigned int sample_rate){
+void check_adjust_scrubber(Vector2 mouse_pos, Rectangle* playback_line, bool* dragging_scrubber,
+            bool playing, sound_meta* sound, unsigned int sample_rate){
+    float new_time;
     if (*dragging_scrubber || (btn_pressed(mouse_pos,playback_line))) {
         if(ma_sound_is_playing(&sound->audio)) ma_sound_stop(&sound->audio);
-        *new_time = (mouse_pos->x - playback_line->x) / playback_line->width * sound->duration;
-        ma_sound_seek_to_pcm_frame(&sound->audio, fmin(*new_time*sample_rate, sound->duration*sample_rate));
+        new_time = (mouse_pos.x - playback_line->x) / playback_line->width * sound->duration;
+        ma_sound_seek_to_pcm_frame(&sound->audio, fmin(new_time*sample_rate, sound->duration*sample_rate));
         *dragging_scrubber = 1;
     }
     if (*dragging_scrubber && IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
@@ -120,6 +121,20 @@ void check_adjust_scrubber(Vector2* mouse_pos, Rectangle* playback_line, bool* d
 }
 
 
+void handle_audio(Vector2 mouse_pos, Vector2 play_btn_center, float play_btn_radius,
+        Rectangle* playback_line, bool* playing, float* progress, bool* dragging_scrubber, sound_meta* sound, unsigned int sample_rate){
+
+    check_play_btn_pressed(mouse_pos, play_btn_center, play_btn_radius, playing, &sound->audio);
+
+    check_adjust_scrubber(mouse_pos, playback_line, dragging_scrubber,
+            *playing, sound, sample_rate);
+
+    // update the progress
+    ma_sound_get_cursor_in_seconds(&sound->audio, progress);
+    *progress = *progress / sound->duration;
+    
+    // TODO: check if progress is complete
+}
 
 int main(int argc, char** argv){
     if(argc<2){
@@ -160,24 +175,18 @@ int main(int argc, char** argv){
 
     sound_meta* sound = malloc(sizeof(sound_meta));
     parse_sound(argv[1], sound, &engine);
+    unsigned int sample_rate = engine.sampleRate;
 
     while (!WindowShouldClose()) {
         mouse_pos = GetMousePosition();
 
-        //handle_audio(&mouse_pos, play_btn_center, play_btn_radius, &playback_line, &playing, sound, engine.sampleRate);
-        check_play_btn_pressed(&mouse_pos, play_btn_center, play_btn_radius, &playing, &sound->audio);
-
-        check_adjust_scrubber(&mouse_pos, &playback_line, &dragging_scrubber,
-                playing, sound, &new_time, engine.sampleRate);
-
-        // update the progress
-        ma_sound_get_cursor_in_seconds(&sound->audio, &progress);
-        progress = progress / sound->duration;
+        handle_audio(mouse_pos, play_btn_center, play_btn_radius, &playback_line,
+                &playing, &progress, &dragging_scrubber, sound, sample_rate);
 
         BeginDrawing();
         ClearBackground((Color){20, 20, 20, 255});
 
-        draw_scrub_player(&mouse_pos, play_btn_center, play_btn_radius, &playback_line, progress, playing, sound);
+        draw_scrub_player(mouse_pos, play_btn_center, play_btn_radius, &playback_line, progress, playing, sound);
 
         EndDrawing();
     }
