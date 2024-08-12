@@ -32,7 +32,7 @@ bool flag_download_complete = false;
 bool flag_download_failed = false;
 
 void draw_sidebar();
-void draw_home(Font* font, Node* songbook[MAX_SONGS], Vector2 mouse_pos, SoundMeta** current_song, bool* playing);
+void draw_home(Font* font, Node* songbook[MAX_SONGS], Queue* queue, Vector2 mouse_pos, SoundMeta** current_song, bool* playing);
 void draw_library(Font* font, Node* songbook[MAX_SONGS]);
 void draw_download(Font* font, Node* songbook[MAX_SONGS], Vector2 mouse_pos);
 
@@ -62,11 +62,11 @@ void update_scrn_manager(Vector2 mouse_pos){
     }
 }
 
-void draw_scene(Font* font, Node* songbook[MAX_SONGS], Vector2 mouse_pos, SoundMeta** current_song, bool* playing){
+void draw_scene(Font* font, Node* songbook[MAX_SONGS], Queue* queue, Vector2 mouse_pos, SoundMeta** current_song, bool* playing){
     draw_sidebar();
     switch (current_scene) {
         case SCENE_HOME:
-            draw_home(font, songbook, mouse_pos, current_song, playing);
+            draw_home(font, songbook, queue, mouse_pos, current_song, playing);
             break;
         case SCENE_LIBRARY:
             draw_library(font, songbook);
@@ -91,7 +91,7 @@ void draw_sidebar(){
 }
 
 
-void song_scroll(Font* font, Node* songbook[MAX_SONGS], int len_book, int total_songs, bool chaining,
+void song_scroll(Font* font, Node* songbook[MAX_SONGS], Queue* queue, int len_book, int total_songs, bool chaining,
         Vector2 mouse_pos, SoundMeta** current_song, bool* playing, int x, int y, int VISIBLE_ITEMS) {
     const float scrollSpeed = 4.0f;
 
@@ -117,20 +117,36 @@ void song_scroll(Font* font, Node* songbook[MAX_SONGS], int len_book, int total_
 
                 Rectangle rect = { g_width / 4.0f + x, startY + 10 + y, g_width / 2.0f, ITEM_HEIGHT };
 
-                if(btn_pressed(mouse_pos, &rect)){
-                    printf("Changing song to: %s\n", temp->meta->file_name);
-                    if((*current_song)->initialized){
-                        ma_sound_stop(&(*current_song)->audio);
-                    }
-                    *current_song = temp->meta;
-                    // restart the song and then play it
-                    ma_sound_seek_to_pcm_frame(&(*current_song)->audio, 0);
-                    ma_sound_start(&(*current_song)->audio);
-                    *playing = 1;
-                }
                 
                 if(CheckCollisionPointRec(mouse_pos, rect)){
                     DrawRectangleRec(rect, GRAY);
+
+                    if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
+                        printf("Changing song to: %s\n", temp->meta->file_name);
+                        if((*current_song)->initialized){
+                            ma_sound_stop(&(*current_song)->audio);
+                        }
+                        *current_song = temp->meta;
+                        // restart the song and then play it
+                        ma_sound_seek_to_pcm_frame(&(*current_song)->audio, 0);
+                        ma_sound_start(&(*current_song)->audio);
+                        *playing = 1;
+                    }else if(IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && queue!=NULL){
+                        // ADD TO QUEUE
+                        for(i=0;i<queue->size;++i){
+                            if(queue->songs[i]->file_name == temp->meta->file_name){
+                                printf("Removing %s from queue\n", temp->meta->file_name);
+                                remove_from_queue(queue, i);
+                                i=-1;
+                                break;
+                            }
+                        }
+                        if(i!=-1){
+                            printf("Added song to queue: %s\n", temp->meta->file_name);
+                            queue->songs[queue->size] = temp->meta;
+                            ++queue->size;
+                        }
+                    }
                 } else {
                     DrawRectangleRec(rect, DARKGRAY);
                 }
@@ -278,11 +294,12 @@ void draw_download(Font* font, Node* songbook[MAX_SONGS], Vector2 mouse_pos) {
 }
 
 void draw_library(Font* font, Node* songbook[MAX_SONGS]) {
+
 }
 
 
 
-void draw_home(Font* font, Node* songbook[MAX_SONGS], Vector2 mouse_pos, SoundMeta** current_song, bool* playing) {
+void draw_home(Font* font, Node* songbook[MAX_SONGS], Queue* queue, Vector2 mouse_pos, SoundMeta** current_song, bool* playing) {
 
     int i, matches;
     Node* temp;
@@ -305,9 +322,9 @@ void draw_home(Font* font, Node* songbook[MAX_SONGS], Vector2 mouse_pos, SoundMe
             }
         }
         // maximum of 5 results at a time
-        song_scroll(font, match_list, matches, matches, false, mouse_pos, current_song, playing, 0, 100, 5);
+        song_scroll(font, match_list, queue, matches, matches, false, mouse_pos, current_song, playing, 0, 100, 5);
     }else{
-        song_scroll(font, songbook, MAX_SONGS, *song_count, true, mouse_pos, current_song, playing, 0, 100, 5);
+        song_scroll(font, songbook, queue, MAX_SONGS, *song_count, true, mouse_pos, current_song, playing, 0, 100, 5);
     }
 
     Rectangle search_bar = {(g_width-400)/2.0f, 20, 400, 40};

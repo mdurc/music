@@ -6,6 +6,7 @@
 
 
 #define MAX_PLAYLISTS 10
+#define MAX_QUEUE 10
 #define MAX_SONGS 1000
 #define MAX_FNAME_LEN 16
 
@@ -20,11 +21,14 @@ typedef struct{
     ma_sound audio;
 } SoundMeta;
 
-
+typedef struct {
+    SoundMeta* songs[MAX_QUEUE];
+    int size;
+} Queue;
 
 typedef struct {
     char name[MAX_FNAME_LEN];
-    char* song_file_names[MAX_SONGS]; // Array of file names or indices
+    SoundMeta* songs[MAX_SONGS];
     int song_count;
 } Playlist;
 
@@ -41,6 +45,7 @@ void add(Node* songbook[MAX_SONGS], SoundMeta* sound);
 SoundMeta* find(Node* songbook[MAX_SONGS], char* file_name);
 void parse_sound(const char* filepath, const char* filename, SoundMeta* sound, ma_engine* engine);
 
+void remove_from_queue(Queue* queue, int i);
 
 void reload_music_dir(int* song_count, Node* songbook[MAX_SONGS]);
 

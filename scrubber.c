@@ -84,4 +84,6 @@ void handle_audio(Vector2 mouse_pos, Vector2 play_btn_center, float play_btn_rad
     *progress = *progress / sound->duration;
     
     // TODO: check if progress is complete
+    // TODO: QUEUE
+    // TODO: PLAY NEXT IN QUEUE
 }

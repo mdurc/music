@@ -43,6 +43,15 @@ SoundMeta* find(Node* songbook[MAX_SONGS], char* file_name){
 }
 
 
+void remove_from_queue(Queue* queue, int i){
+    queue->songs[i] = NULL;
+    for(;i<queue->size-1;++i){
+        queue->songs[i] = queue->songs[i+1];
+    }
+    --queue->size;
+}
+
+
 void format_file_size(off_t size, char* buffer) {
     if (size >= 1024 * 1024) {
         snprintf(buffer, 20, "%.2f MB", (double)size / (1024 * 1024));
@@ -77,6 +86,7 @@ void parse_sound(const char* filepath, const char* filename, SoundMeta* sound, m
 }
 
 
+// TODO: is this necessary
 bool btn_pressed(Vector2 mouse_pos, Rectangle* btn){
     return CheckCollisionPointRec(mouse_pos, *btn) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
 }
@@ -156,11 +166,8 @@ int main(){
 
     int i;
     Node* songbook[MAX_SONGS];
+    Queue queue;
     Playlist* playlists[MAX_PLAYLISTS];
-    for(i=0; i<MAX_SONGS; ++i){
-        songbook[i] = NULL;
-        if(i<MAX_PLAYLISTS) playlists[i] = NULL;
-    }
 
 
     const int WIDTH = 800;
@@ -188,7 +195,7 @@ int main(){
     if (result != MA_SUCCESS) { 
         fprintf(stderr, "Engine failed");
         exit(EXIT_FAILURE);
-     }
+    }
 
     //  =======
     // Opengl Context
@@ -201,9 +208,18 @@ int main(){
 
     sample_rate = engine.sampleRate;
 
+    // INITILIZE
+    for(i=0; i<MAX_SONGS; ++i){
+        songbook[i] = NULL;
+        if(i<MAX_QUEUE) queue.songs[i] = NULL;
+        if(i<MAX_PLAYLISTS) playlists[i] = NULL;
+    }
+    queue.size = 0;
     reload_music_dir(&song_count, songbook);
 
     init_scrn_manager(WIDTH, HEIGHT, &song_count);
+
+
 
     while (!WindowShouldClose()) {
         mouse_pos = GetMousePosition();
@@ -216,7 +232,7 @@ int main(){
         BeginDrawing();
         ClearBackground((Color){20, 20, 20, 255});
 
-        draw_scene(&font, songbook, mouse_pos, &current_song, &playing);
+        draw_scene(&font, songbook, &queue, mouse_pos, &current_song, &playing);
         draw_scrub_player(&font, mouse_pos, play_btn_center, play_btn_radius, &playback_line, progress, playing, current_song);
 
         EndDrawing();
