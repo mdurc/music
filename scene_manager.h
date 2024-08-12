@@ -5,7 +5,7 @@
 
 typedef enum {
     SCENE_HOME,
-    SCENE_FAVORITES,
+    SCENE_LIBRARY,
     SCENE_SEARCH
 } SceneType;
 

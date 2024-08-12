@@ -7,7 +7,7 @@
 #define VISIBLE_ITEMS 8
 
 Rectangle home = {10, 10, ICON_SIZE, ICON_SIZE};
-Rectangle fav = {10, 60, ICON_SIZE, ICON_SIZE};
+Rectangle lib = {10, 60, ICON_SIZE, ICON_SIZE};
 Rectangle search = {10, 110, ICON_SIZE, ICON_SIZE};
 SceneType current_scene = SCENE_HOME;
 
@@ -20,7 +20,7 @@ SongButton song_btns[VISIBLE_ITEMS]; // only give the option to press the VISIBL
 
 void draw_sidebar();
 void draw_home(Font font, Node* songbook[MAX_SONGS], Vector2 mouse_pos);
-void draw_favorites(Font font, Node* songbook[MAX_SONGS]);
+void draw_library(Font font, Node* songbook[MAX_SONGS]);
 void draw_search(Font font, Node* songbook[MAX_SONGS]);
 
 
@@ -35,13 +35,14 @@ void update_scrn_manager(Vector2 mouse_pos, SoundMeta** current_song, bool* play
     if (btn_pressed(mouse_pos, &home)) {
         current_scene = SCENE_HOME;
         printf("Changed to home scene\n");
-    }else if (btn_pressed(mouse_pos, &fav)) {
-        current_scene = SCENE_FAVORITES;
+    }else if (btn_pressed(mouse_pos, &lib)) {
+        current_scene = SCENE_LIBRARY;
         printf("Changed to favorites scene\n");
     }else if (btn_pressed(mouse_pos, &search)) {
         current_scene = SCENE_SEARCH;
         printf("Changed to search scene\n");
-    }else{
+    }else if(current_scene == SCENE_HOME){
+        // Check for button presses to switch song
         for(i=0;i<btn_count;++i){
             if(btn_pressed(mouse_pos, &song_btns[i].rect)){
                 printf("Changing song to: %s\n", song_btns[i].meta->file_name);
@@ -64,8 +65,8 @@ void draw_scene(Font font, Node* songbook[MAX_SONGS], Vector2 mouse_pos){
         case SCENE_HOME:
             draw_home(font, songbook, mouse_pos);
             break;
-        case SCENE_FAVORITES:
-            draw_favorites(font, songbook);
+        case SCENE_LIBRARY:
+            draw_library(font, songbook);
             break;
         case SCENE_SEARCH:
             draw_search(font, songbook);
@@ -82,7 +83,7 @@ void draw_sidebar(){
 
     // Home, favorites, search
     DrawRectangleRec(home, (Color){200, 0, 0, 255});
-    DrawRectangleRec(fav, (Color){0, 200, 0, 255});
+    DrawRectangleRec(lib, (Color){0, 200, 0, 255});
     DrawRectangleRec(search, (Color){0, 0, 200, 255});
 }
 
@@ -136,16 +137,14 @@ void draw_home(Font font, Node* songbook[MAX_SONGS], Vector2 mouse_pos) {
 
     Rectangle perimeter = {
         g_width / 4.0f - 13-ITEM_HEIGHT,     // x coord
-        -ITEM_HEIGHT,                      // y coord
+        -ITEM_HEIGHT,                        // y coord
         g_width / 2.0f + 24 + ITEM_HEIGHT*2, // width
-        visible_item_len+19+ITEM_HEIGHT         // height
+        visible_item_len+19+ITEM_HEIGHT      // height
     };
-    //DrawRectangleLinesEx(perimeter, ITEM_HEIGHT+8 /* thickness */, DARKGRAY);
-    
     DrawRectangleLinesEx(perimeter, ITEM_HEIGHT+8 /* thickness */, (Color){20, 20, 20, 255});
 }
 
-void draw_favorites(Font font, Node* songbook[MAX_SONGS]) {
+void draw_library(Font font, Node* songbook[MAX_SONGS]) {
 }
 
 void draw_search(Font font, Node* songbook[MAX_SONGS]) {
