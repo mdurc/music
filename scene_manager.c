@@ -6,7 +6,6 @@
 
 #define SIDEBAR_WIDTH 60
 #define ICON_SIZE 40
-#define ITEM_HEIGHT 40
 #define MAX_INPUT_CHARS 43 // size of youtube url
 
 Rectangle home = {10, 10, ICON_SIZE, ICON_SIZE};
@@ -30,7 +29,7 @@ bool flag_download_complete = false;
 bool flag_download_failed = false;
 
 void draw_sidebar();
-void draw_home(Font* font, AllSongs* songbook, Queue* queue, Vector2 mouse_pos);
+void draw_home(Font* font, AllSongs* songbook, AllSongs* queue, Vector2 mouse_pos);
 void draw_library(Font* font, AllSongs* songbook);
 void draw_download(Font* font, AllSongs* songbook, Vector2 mouse_pos);
 
@@ -57,7 +56,7 @@ void update_scrn_manager(Vector2 mouse_pos){
     }
 }
 
-void draw_scene(Font* font, AllSongs* songbook, Queue* queue, Vector2 mouse_pos){
+void draw_scene(Font* font, AllSongs* songbook, AllSongs* queue, Vector2 mouse_pos){
     draw_sidebar();
     switch (current_scene) {
         case SCENE_HOME:
@@ -88,8 +87,8 @@ void draw_sidebar(){
 
 // include songbook for current_song and is_playing.
 // song_list_to_show is for what songs are shown on the list
-void song_scroll(Font* font, AllSongs* songbook, AllSongs* song_list_to_show, Queue* queue,
-        Vector2 mouse_pos, int x, int y, int VISIBLE_ITEMS) {
+void song_scroll(Font* font, AllSongs* songbook, AllSongs* song_list_to_show, AllSongs* queue,
+        Vector2 mouse_pos, int x, int y, int ITEM_HEIGHT, int VISIBLE_ITEMS, bool disable_scroll) {
     const float scrollSpeed = 4.0f;
 
     float max_scroll = song_list_to_show->size;
@@ -100,18 +99,18 @@ void song_scroll(Font* font, AllSongs* songbook, AllSongs* song_list_to_show, Qu
     max_scroll = max_scroll*(ITEM_HEIGHT+gap) - visible_item_len + ITEM_HEIGHT;
     if (max_scroll < 0) max_scroll = 0;
 
-    if(song_list_to_show->size >= VISIBLE_ITEMS) g_scrollOffset -= GetMouseWheelMove() * scrollSpeed;
+    if(!disable_scroll && song_list_to_show->size >= VISIBLE_ITEMS) g_scrollOffset -= GetMouseWheelMove() * scrollSpeed;
 
-    if (g_scrollOffset < 0) g_scrollOffset = 0;
-    if (g_scrollOffset > max_scroll) g_scrollOffset = max_scroll;
+    if (!disable_scroll && g_scrollOffset < 0) g_scrollOffset = 0;
+    if (!disable_scroll && g_scrollOffset > max_scroll) g_scrollOffset = max_scroll;
 
-    startY = -g_scrollOffset;
+    startY = disable_scroll ? 0: -g_scrollOffset;
 
     for(i=0; i<song_list_to_show->size; ++i){
         temp = song_list_to_show->songs[i];
         if (startY >= -ITEM_HEIGHT && startY < visible_item_len-ITEM_HEIGHT) {
 
-            Rectangle rect = { g_width / 4.0f + x, startY + 10 + y, g_width / 2.0f, ITEM_HEIGHT };
+            Rectangle rect = { g_width / 4.0f + x, startY + 10 + y, disable_scroll?130:400, ITEM_HEIGHT };
 
             if(CheckCollisionPointRec(mouse_pos, rect)){
                 DrawRectangleRec(rect, GRAY);
@@ -147,8 +146,8 @@ void song_scroll(Font* font, AllSongs* songbook, AllSongs* song_list_to_show, Qu
                 DrawRectangleRec(rect, DARKGRAY);
             }
             DrawTextEx(*font, temp->file_name, 
-                    (Vector2){g_width / 4.0f + 10 + x, startY + 20 + y}, 
-                    20, 2, WHITE);
+                    (Vector2){g_width / 4.0f + 10 + x, startY + ITEM_HEIGHT/2.0 + y + (disable_scroll?5:0)}, 
+                    ITEM_HEIGHT/2.0, 2, WHITE);
         }
         startY += ITEM_HEIGHT+gap;
         // we found all the songs we need for now
@@ -241,6 +240,7 @@ void draw_search_bar(Font* font, Rectangle* search_bar){
 
 
 
+// TODO: download playlist and add to playlists
 void draw_download(Font* font, AllSongs* songbook, Vector2 mouse_pos) {
     int i, y_offset;
     char cmd[150 + MAX_INPUT_CHARS];
@@ -290,7 +290,7 @@ void draw_library(Font* font, AllSongs* songbook) {
 
 
 
-void draw_home(Font* font, AllSongs* songbook, Queue* queue, Vector2 mouse_pos) {
+void draw_home(Font* font, AllSongs* songbook, AllSongs* queue, Vector2 mouse_pos) {
 
     int i;
     AllSongs match_list;
@@ -306,10 +306,14 @@ void draw_home(Font* font, AllSongs* songbook, Queue* queue, Vector2 mouse_pos) 
             }
         }
         // maximum of 5 results at a time
-        song_scroll(font, songbook, &match_list, queue, mouse_pos, 0, 100, 5);
+        song_scroll(font, songbook, &match_list/* what is being shown */, queue, mouse_pos, -70, 100, 40, 5, false);
     }else{
-        song_scroll(font, songbook, songbook, queue, mouse_pos, 0, 100, 5);
+        song_scroll(font, songbook, songbook, queue, mouse_pos, -70, 100, 40, 5, false);
     }
+
+    // DRAW QUEUE
+    song_scroll(font, songbook, queue, queue, mouse_pos, 400, 100, 20, 5, true);
+
 
     Rectangle search_bar = {(g_width-400)/2.0f, 20, 400, 40};
     // check if KEY_ENTER was pressed

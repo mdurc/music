@@ -17,6 +17,6 @@ typedef struct {
 
 void init_scrn_manager(const int WIDTH, const int HIEGHT);
 void update_scrn_manager(Vector2 mouse_pos);
-void draw_scene(Font* font, AllSongs* songbook, Queue* queue, Vector2 mouse_pos);
+void draw_scene(Font* font, AllSongs* songbook, AllSongs* queue, Vector2 mouse_pos);
 
 #endif

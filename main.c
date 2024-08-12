@@ -23,7 +23,7 @@ SoundMeta* find(AllSongs* songbook, char* file_name){
 }
 
 
-void remove_from_queue(Queue* queue, int i){
+void remove_from_queue(AllSongs* queue, int i){
     queue->songs[i] = NULL;
     for(;i<queue->size-1;++i){
         queue->songs[i] = queue->songs[i+1];
@@ -139,7 +139,7 @@ int main(){
 
     int i;
     AllSongs songbook;
-    Queue queue;
+    AllSongs queue;
     Playlist* playlists[MAX_PLAYLISTS];
 
 
@@ -180,7 +180,7 @@ int main(){
     // INITILIZE
     for(i=0; i<MAX_SONGS; ++i){
         songbook.songs[i] = NULL;
-        if(i<MAX_QUEUE) queue.songs[i] = NULL;
+        if(i<MAX_SONGS) queue.songs[i] = NULL;
         if(i<MAX_PLAYLISTS) playlists[i] = NULL;
     }
     songbook.size = 0;
