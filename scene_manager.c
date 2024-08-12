@@ -86,11 +86,13 @@ void draw_sidebar(){
 }
 
 
-void song_scroll(Font* font, AllSongs* songbook, Queue* queue,
+// include songbook for current_song and is_playing.
+// song_list_to_show is for what songs are shown on the list
+void song_scroll(Font* font, AllSongs* songbook, AllSongs* song_list_to_show, Queue* queue,
         Vector2 mouse_pos, int x, int y, int VISIBLE_ITEMS) {
     const float scrollSpeed = 4.0f;
 
-    float max_scroll = songbook->size;
+    float max_scroll = song_list_to_show->size;
     int gap = 5;
     int i, startY, visible_item_len = VISIBLE_ITEMS*(ITEM_HEIGHT+gap);
     SoundMeta* temp;
@@ -98,15 +100,15 @@ void song_scroll(Font* font, AllSongs* songbook, Queue* queue,
     max_scroll = max_scroll*(ITEM_HEIGHT+gap) - visible_item_len + ITEM_HEIGHT;
     if (max_scroll < 0) max_scroll = 0;
 
-    if(songbook->size >= VISIBLE_ITEMS) g_scrollOffset -= GetMouseWheelMove() * scrollSpeed;
+    if(song_list_to_show->size >= VISIBLE_ITEMS) g_scrollOffset -= GetMouseWheelMove() * scrollSpeed;
 
     if (g_scrollOffset < 0) g_scrollOffset = 0;
     if (g_scrollOffset > max_scroll) g_scrollOffset = max_scroll;
 
     startY = -g_scrollOffset;
 
-    for(i=0; i<songbook->size; ++i){
-        temp = songbook->songs[i];
+    for(i=0; i<song_list_to_show->size; ++i){
+        temp = song_list_to_show->songs[i];
         if (startY >= -ITEM_HEIGHT && startY < visible_item_len-ITEM_HEIGHT) {
 
             Rectangle rect = { g_width / 4.0f + x, startY + 10 + y, g_width / 2.0f, ITEM_HEIGHT };
@@ -304,9 +306,9 @@ void draw_home(Font* font, AllSongs* songbook, Queue* queue, Vector2 mouse_pos) 
             }
         }
         // maximum of 5 results at a time
-        song_scroll(font, &match_list, queue, mouse_pos, 0, 100, 5);
+        song_scroll(font, songbook, &match_list, queue, mouse_pos, 0, 100, 5);
     }else{
-        song_scroll(font, songbook, queue, mouse_pos, 0, 100, 5);
+        song_scroll(font, songbook, songbook, queue, mouse_pos, 0, 100, 5);
     }
 
     Rectangle search_bar = {(g_width-400)/2.0f, 20, 400, 40};
