@@ -5,6 +5,7 @@
 #include "libs/miniaudio.h"
 
 
+#define MAX_PLAYLISTS 10
 #define MAX_SONGS 1000
 #define MAX_FNAME_LEN 16
 
@@ -20,6 +21,14 @@ typedef struct{
 } SoundMeta;
 
 
+
+typedef struct {
+    char name[MAX_FNAME_LEN];
+    char* song_file_names[MAX_SONGS]; // Array of file names or indices
+    int song_count;
+} Playlist;
+
+
 // For hashtable of songs
 typedef struct Node {
     SoundMeta* meta;
@@ -30,7 +39,7 @@ typedef struct Node {
 int hash_f(char* file_name);
 void add(Node* songbook[MAX_SONGS], SoundMeta* sound);
 SoundMeta* find(Node* songbook[MAX_SONGS], char* file_name);
-void parse_sound(const char* filepath, SoundMeta* sound, ma_engine* engine);
+void parse_sound(const char* filepath, const char* filename, SoundMeta* sound, ma_engine* engine);
 
 
 void reload_music_dir(int* song_count, Node* songbook[MAX_SONGS]);

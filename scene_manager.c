@@ -22,6 +22,10 @@ int* song_count;
 
 // For search
 char input_buf[MAX_INPUT_CHARS + 1] = "\0"; // plus one for null terminating character
+char output_buf[20][1024];
+int output_line=0;
+
+
 int letter_count = 0, frame_count=0;
 bool mouse_on_search = false;
 bool flag_download_complete = false;
@@ -218,7 +222,7 @@ void draw_search_bar(Font* font, Rectangle* search_bar){
     else DrawRectangleRoundedLines(*search_bar, 0.5f, 8, 2, DARKGRAY);
 
     DrawTextEx(*font, input_buf, (Vector2){search_bar->x+10, search_bar->y+10}, 20, 1, DARKBLUE);
-    DrawTextEx(*font, TextFormat("INPUT CHARS: %i/%i", letter_count, MAX_INPUT_CHARS), (Vector2){315, search_bar->y+55}, 20, 1, DARKGRAY);
+    //DrawTextEx(*font, TextFormat("INPUT CHARS: %i/%i", letter_count, MAX_INPUT_CHARS), (Vector2){315, search_bar->y+55}, 20, 1, DARKGRAY);
 
     if (mouse_on_search){
         if (letter_count < MAX_INPUT_CHARS){
@@ -231,14 +235,20 @@ void draw_search_bar(Font* font, Rectangle* search_bar){
 
 
 void draw_download(Font* font, Node* songbook[MAX_SONGS], Vector2 mouse_pos) {
-    Rectangle search_bar = {(g_width-400)/2.0f, 20, 400, 40};
+    int i, y_offset;
+    char cmd[150 + MAX_INPUT_CHARS];
+    Rectangle search_bar = {(g_width-400)/2.0f, 60, 400, 40};
     if(create_search_bar(&search_bar, mouse_pos)){
         // try to download this char using cmd:
-        char cmd[150 + MAX_INPUT_CHARS];
         snprintf(cmd, sizeof(cmd), "yt-dlp -o '%%(title)s.%%(ext)s' -x --audio-format mp3 --audio-quality 0 \"https://www.youtube.com/watch?v=%s\" -P \"music/\"", input_buf);
         printf("Attempting command: %s\n", cmd);
 
-        if(system(cmd) == 0){
+        output_line = 0;
+        FILE *fp = popen(cmd, "r");
+        while (fgets(output_buf[output_line], sizeof(output_buf[output_line]), fp) != NULL) { ++output_line; }
+
+
+        if(output_line == 10){
             printf("Command Succeeded\n");
             flag_download_complete = 1;
             flag_download_failed = 0;
@@ -251,11 +261,19 @@ void draw_download(Font* font, Node* songbook[MAX_SONGS], Vector2 mouse_pos) {
         }
     }
 
+
+    DrawTextEx(*font, "Download Youtube Songs", (Vector2){search_bar.x+45, 20}, 25, 1, DARKGRAY);
     draw_search_bar(font, &search_bar);
+
+    y_offset = 80;
+    for(i=0;i<output_line;++i){
+        DrawTextEx(*font, output_buf[i], (Vector2){search_bar.x-120, search_bar.y + y_offset}, 15, 1, DARKGRAY);
+        y_offset += 20;
+    }
     if(flag_download_complete){
-        DrawTextEx(*font, "Download Complete", (Vector2){315, search_bar.y+80}, 20, 1, DARKGRAY);
+        DrawTextEx(*font, "Download Complete", (Vector2){search_bar.x+95, search_bar.y+50}, 20, 1, GRAY);
     }else if(flag_download_failed){
-        DrawTextEx(*font, "Download Failed", (Vector2){315, search_bar.y+80}, 20, 1, DARKGRAY);
+        DrawTextEx(*font, "Download Failed", (Vector2){search_bar.x+110, search_bar.y+50}, 20, 1, GRAY);
     }
 }
 

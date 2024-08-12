@@ -53,7 +53,7 @@ void format_file_size(off_t size, char* buffer) {
     }
 }
 
-void parse_sound(const char* filepath, SoundMeta* sound, ma_engine* engine) {
+void parse_sound(const char* filepath, const char* filename, SoundMeta* sound, ma_engine* engine) {
     struct stat file_stat;
 
     if (stat(filepath, &file_stat) == -1) {
@@ -69,17 +69,8 @@ void parse_sound(const char* filepath, SoundMeta* sound, ma_engine* engine) {
 
     format_file_size(file_stat.st_size, sound->file_size);
 
-    const char* filename = strrchr(filepath, '/');
-    if(filename) filename++;
-    else filename = filepath;
-
-   if (strlen(filename) > MAX_FNAME_LEN){
-        strncpy(sound->file_name, filename, MAX_FNAME_LEN - 3);
-        strcat(sound->file_name, "...");
-    } else {
-        strncpy(sound->file_name, filename, sizeof(sound->file_name) - 1);
-        sound->file_name[sizeof(sound->file_name) - 1] = '\0';
-    }
+    strncpy(sound->file_name, filename, sizeof(sound->file_name) - 1);
+    sound->file_name[sizeof(sound->file_name) - 1] = '\0';
 
     sound->favorite = 0;
     sound->initialized = 1;
@@ -112,49 +103,65 @@ void load_songs_from_directory( const char* dir_path, Node* songbook[MAX_SONGS],
     DIR *dir;
     struct dirent *entry;
     char file_path[1035];
+    char filename[256];
+    char* file_name_start;
     
     if ((dir = opendir(dir_path)) == NULL) {
         perror("opendir");
         return;
     }
     int i = 0;
-    
+
     while ((entry = readdir(dir)) != NULL) {
         // find regular files, mp3
         if (entry->d_type == DT_REG) {
             ++i;
 
             snprintf(file_path, sizeof(file_path), "%s/%s", dir_path, entry->d_name);
-            SoundMeta* new_song = malloc(sizeof(SoundMeta));
-            if (new_song == NULL) {
-                perror("malloc");
-                continue;
+
+            file_name_start = strrchr(file_path, '/');
+            if (file_name_start) file_name_start++;
+            else file_name_start = file_path;
+
+            strncpy(filename, file_name_start, sizeof(filename) - 1);
+            filename[sizeof(filename) - 1] = '\0';
+
+            if (strlen(filename) > MAX_FNAME_LEN) {
+                strncpy(filename + MAX_FNAME_LEN - 3, "...", 4);
             }
-            
-            parse_sound(file_path, new_song, engine);
-            printf("Added song #%d: %s, ",i, new_song->file_name);
-            add(songbook, new_song);
-            ++(*song_count);
+
+            if(find(songbook, filename) == NULL){
+                printf("Adding new song #%d: %s, ",i, filename);
+                SoundMeta* new_song = malloc(sizeof(SoundMeta));
+                if (new_song == NULL) { perror("malloc"); continue; }
+
+                parse_sound(file_path, filename, new_song, engine);
+                add(songbook, new_song);
+                ++(*song_count);
+            }
         }
     }
-    
+
     closedir(dir);
 }
 
 
 void reload_music_dir(int* song_count, Node* songbook[MAX_SONGS]){
-    *song_count = 0;
-    clear_mem(songbook);
+    printf("SONG COUNT: %d\n", *song_count);
     load_songs_from_directory("music/", songbook, &engine, song_count);
+    printf("NEW SONG COUNT: %d\n", *song_count);
 }
 
 int main(){
 
     int i;
     Node* songbook[MAX_SONGS];
+    Playlist* playlists[MAX_PLAYLISTS];
     for(i=0; i<MAX_SONGS; ++i){
         songbook[i] = NULL;
+        if(i<MAX_PLAYLISTS) playlists[i] = NULL;
     }
+
 
     const int WIDTH = 800;
     const int HEIGHT = 450;
