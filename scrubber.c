@@ -1,10 +1,15 @@
+#include <math.h>
+#include <stdio.h>
+#include <unistd.h>
+
+
 #include "shared.h"
 
-
-void draw_scrub_player(Font* font, Vector2 mouse_pos, Vector2 play_btn_center, float play_btn_radius, Rectangle* playback_line, float progress, bool playing, sound_meta* sound){
+void draw_scrub_player(Font* font, Vector2 mouse_pos, Vector2 play_btn_center, float play_btn_radius, Rectangle* playback_line, float progress, bool playing, SoundMeta* sound){
     char time_stamps[10];
     char* play_text;
     Vector2 text_size;
+    float dur = sound ? sound->duration: 0.0f;
     if(CheckCollisionPointCircle(mouse_pos, play_btn_center, play_btn_radius)){
         DrawCircleV(play_btn_center, play_btn_radius, LIGHTGRAY);
     }else{
@@ -22,14 +27,16 @@ void draw_scrub_player(Font* font, Vector2 mouse_pos, Vector2 play_btn_center, f
     DrawRectangleRounded((Rectangle){playback_line->x, playback_line->y, playback_line->width * progress, playback_line->height}, 0.5f, 8, WHITE);
 
 
-    snprintf(time_stamps, sizeof(time_stamps), "%d:%02d", (int)(progress*sound->duration)/60, (int)(progress*sound->duration) % 60);
-    DrawTextEx(*font, time_stamps, (Vector2){playback_line->x - 50, playback_line->y - 5}, 20, 1, WHITE);
-    snprintf(time_stamps, sizeof(time_stamps), "%d:%02d", (int)sound->duration/60, (int)sound->duration % 60);
-    DrawTextEx(*font, time_stamps, (Vector2){playback_line->x + playback_line->width + 10, playback_line->y - 5}, 20, 1, WHITE);
+    snprintf(time_stamps, sizeof(time_stamps), "%d:%02d", (int)(progress*dur)/60, (int)(progress*dur) % 60);
+    DrawTextEx(*font, time_stamps, (Vector2){playback_line->x + 11, playback_line->y + 15}, 20, 1, WHITE);
+    snprintf(time_stamps, sizeof(time_stamps), "%d:%02d", (int)dur/60, (int)dur % 60);
+    DrawTextEx(*font, time_stamps, (Vector2){playback_line->x + playback_line->width - 55, playback_line->y + 15}, 20, 1, WHITE);
 
-    DrawTextEx(*font, TextFormat("%s", sound->file_name), (Vector2){playback_line->x+10, playback_line->y-30}, 20, 1, WHITE);
+    play_text = sound ? sound->file_name : "N/A";
+    DrawTextEx(*font, TextFormat("%s", play_text), (Vector2){playback_line->x+10, playback_line->y-30}, 20, 1, WHITE);
     //DrawTextEx(*font, TextFormat("%s", sound->file_size), (Vector2){playback_line->x+130, playback_line->y-30}, 20, 1, WHITE);
-    DrawTextEx(*font, TextFormat("%s", sound->mod_date), (Vector2){playback_line->width-20, playback_line->y-30}, 20, 1, WHITE);
+    //play_text = sound ? sound->mod_date : "N/A"; // not using exiftool for mod date anymore
+    //DrawTextEx(*font, TextFormat("%s", play_text), (Vector2){playback_line->width-20, playback_line->y-30}, 20, 1, WHITE);
 }
 
 void check_play_btn_pressed(Vector2 mouse_pos, Vector2 play_btn_center, float play_btn_radius, bool* playing, ma_sound* aud){
@@ -45,7 +52,7 @@ void check_play_btn_pressed(Vector2 mouse_pos, Vector2 play_btn_center, float pl
 }
 
 void check_adjust_scrubber(Vector2 mouse_pos, Rectangle* playback_line, bool* dragging_scrubber,
-            bool playing, sound_meta* sound, unsigned int sample_rate){
+            bool playing, SoundMeta* sound, unsigned int sample_rate){
     float new_time;
     if (*dragging_scrubber || (btn_pressed(mouse_pos,playback_line))) {
         if(ma_sound_is_playing(&sound->audio)) ma_sound_stop(&sound->audio);
@@ -63,9 +70,9 @@ void check_adjust_scrubber(Vector2 mouse_pos, Rectangle* playback_line, bool* dr
 
 }
 
-
 void handle_audio(Vector2 mouse_pos, Vector2 play_btn_center, float play_btn_radius,
-        Rectangle* playback_line, bool* playing, float* progress, bool* dragging_scrubber, sound_meta* sound, unsigned int sample_rate){
+        Rectangle* playback_line, bool* playing, float* progress, bool* dragging_scrubber, SoundMeta* sound, unsigned int sample_rate){
+    if(sound==NULL) return;
 
     check_play_btn_pressed(mouse_pos, play_btn_center, play_btn_radius, playing, &sound->audio);
 

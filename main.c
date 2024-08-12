@@ -2,11 +2,10 @@
 #include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
-
-#include "scrubber.c"
-#include "shared.h"
-
+#define MINIAUDIO_IMPLEMENTATION
+#include "scene_manager.h"
 
 int hash_f(char* file_name){
     int i, hash = 7;
@@ -17,7 +16,7 @@ int hash_f(char* file_name){
 }
 
 
-void add(Node* songbook[MAX_SONGS], sound_meta* sound){
+void add(Node* songbook[MAX_SONGS], SoundMeta* sound){
     int hash = hash_f(sound->file_name);
     printf("Hash: %d\n", hash);
 
@@ -29,7 +28,7 @@ void add(Node* songbook[MAX_SONGS], sound_meta* sound){
 }
 
 
-sound_meta* find(Node* songbook[MAX_SONGS], char* file_name){
+SoundMeta* find(Node* songbook[MAX_SONGS], char* file_name){
     int hash = hash_f(file_name);
     Node* temp = songbook[hash];
     while(temp){
@@ -42,35 +41,50 @@ sound_meta* find(Node* songbook[MAX_SONGS], char* file_name){
 }
 
 
-void parse_sound(const char* filepath, sound_meta* sound, ma_engine* engine) {
-    FILE *fp;
-    char path[1035];
-    char command[512];
+void format_file_size(off_t size, char* buffer) {
+    if (size >= 1024 * 1024) {
+        snprintf(buffer, 20, "%.2f MB", (double)size / (1024 * 1024));
+    } else if (size >= 1024) {
+        snprintf(buffer, 20, "%.2f KB", (double)size / 1024);
+    } else {
+        snprintf(buffer, 20, "%lld B", (long long)size);
+    }
+}
 
-    snprintf(command, sizeof(command), "exiftool -FileSize -FileModifyDate -FileName %s", filepath);
+void parse_sound(const char* filepath, SoundMeta* sound, ma_engine* engine) {
+    struct stat file_stat;
 
-    fp = popen(command, "r");
-    if (fp == NULL) {
-        printf("Failed to run command\n");
-        exit(1);
+    if (stat(filepath, &file_stat) == -1) {
+        perror("stat");
+        exit(EXIT_FAILURE);
     }
 
-    if (ma_sound_init_from_file(engine, filepath, 0, NULL, NULL, &sound->audio)!= MA_SUCCESS) { 
-        fprintf(stderr, "Sound failed\n");
+    if (ma_sound_init_from_file(engine, filepath, 0, NULL, NULL, &sound->audio) != MA_SUCCESS) {
+        fprintf(stderr, "Sound failed: %s\n", filepath);
         exit(EXIT_FAILURE);
     }
     ma_sound_get_length_in_seconds(&sound->audio, &sound->duration);
 
-    // defaults
-    strcpy(sound->file_size, "0.0 MB");
-    strcpy(sound->file_name, "Unknown");
-    strcpy(sound->mod_date, "Unknown");
+    format_file_size(file_stat.st_size, sound->file_size);
 
-    if (fgets(path, sizeof(path)-1, fp)) sscanf(path, "File Size : %[^\n]", sound->file_size);
-    if (fgets(path, sizeof(path)-1, fp)) sscanf(path, "File Modification Date/Time : %[^ ]", sound->mod_date);
-    if (fgets(path, sizeof(path)-1, fp)) sscanf(path, "File Name : %[^\n]", sound->file_name);
+    const char* filename = strrchr(filepath, '/');
+    if(filename) filename++;
+    else filename = filepath;
 
-    pclose(fp);
+   if (strlen(filename) > MAX_FNAME_LEN){
+        strncpy(sound->file_name, filename, MAX_FNAME_LEN - 3);
+        strcat(sound->file_name, "...");
+    } else {
+        strncpy(sound->file_name, filename, sizeof(sound->file_name) - 1);
+        sound->file_name[sizeof(sound->file_name) - 1] = '\0';
+    }
+
+    sound->favorite = 0;
+}
+
+
+bool btn_pressed(Vector2 mouse_pos, Rectangle* btn){
+    return CheckCollisionPointRec(mouse_pos, *btn) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
 }
 
 
@@ -90,30 +104,34 @@ void clear_mem(Node* songbook[MAX_SONGS]){
 }
 
 
-void load_songs_from_directory(const char* dir_path, Node* songbook[MAX_SONGS], ma_engine* engine) {
+void load_songs_from_directory( const char* dir_path, Node* songbook[MAX_SONGS],
+                                Node* song_list, ma_engine* engine, int* song_count) {
     DIR *dir;
     struct dirent *entry;
-    char file_path[256];
+    char file_path[1035];
     
     if ((dir = opendir(dir_path)) == NULL) {
         perror("opendir");
         return;
     }
+    int i = 0;
     
     while ((entry = readdir(dir)) != NULL) {
         // find regular files, mp3
         if (entry->d_type == DT_REG) {
+            ++i;
 
             snprintf(file_path, sizeof(file_path), "%s/%s", dir_path, entry->d_name);
-                sound_meta *new_song = malloc(sizeof(sound_meta));
-                if (new_song == NULL) {
-                    perror("malloc");
-                    continue;
-                }
-                
-                parse_sound(file_path, new_song, engine);
-                printf("Added song: %s, ", new_song->file_name);
-                add(songbook, new_song);
+            SoundMeta* new_song = malloc(sizeof(SoundMeta));
+            if (new_song == NULL) {
+                perror("malloc");
+                continue;
+            }
+            
+            parse_sound(file_path, new_song, engine);
+            printf("Added song #%d: %s, ",i, new_song->file_name);
+            add(songbook, new_song);
+            ++(*song_count);
         }
     }
     
@@ -128,11 +146,14 @@ int main(){
         songbook[i] = NULL;
     }
 
+    Node* song_list = NULL;
+
     const int WIDTH = 800;
     const int HEIGHT = 450;
-    float new_time, progress;
+    float progress=0.0f;
     bool playing = 0;
     bool dragging_scrubber = 0;
+    int song_count=0;
     unsigned int sample_rate;
 
 
@@ -144,7 +165,7 @@ int main(){
 
     //  =======
     // MINIAUDIO_IMPLEMENTATION
-    sound_meta* current_song;
+    SoundMeta* current_song;
     ma_result result;
     ma_engine engine;
 
@@ -158,13 +179,16 @@ int main(){
     // Opengl Context
     SetTraceLogLevel(LOG_ERROR); // Hide logs in raylib init to console
     InitWindow(WIDTH, HEIGHT, "Rythme");
+    SetWindowState(FLAG_WINDOW_UNDECORATED);
     SetTargetFPS(60);
     Font font = LoadFont("/Users/mdurcan/Library/Fonts/UbuntuMono-B.ttf");
 
-    load_songs_from_directory("music/", songbook, &engine);
+    load_songs_from_directory("music/", songbook, song_list, &engine, &song_count);
     current_song = find(songbook, "Lemon.mp3");
 
     sample_rate = engine.sampleRate;
+
+    init_scrn_manager(WIDTH, HEIGHT, &song_count);
 
     while (!WindowShouldClose()) {
         mouse_pos = GetMousePosition();
@@ -172,9 +196,12 @@ int main(){
         handle_audio(mouse_pos, play_btn_center, play_btn_radius, &playback_line,
                 &playing, &progress, &dragging_scrubber, current_song, sample_rate);
 
+        update_scrn_manager(mouse_pos, &current_song, &playing);
+
         BeginDrawing();
         ClearBackground((Color){20, 20, 20, 255});
 
+        draw_scene(font, songbook, mouse_pos);
         draw_scrub_player(&font, mouse_pos, play_btn_center, play_btn_radius, &playback_line, progress, playing, current_song);
 
         EndDrawing();
