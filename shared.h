@@ -14,6 +14,7 @@ typedef struct{
     char file_size[64];
     float duration;
     bool favorite;
+    bool initialized;
 
     ma_sound audio;
 } SoundMeta;
@@ -30,6 +31,9 @@ int hash_f(char* file_name);
 void add(Node* songbook[MAX_SONGS], SoundMeta* sound);
 SoundMeta* find(Node* songbook[MAX_SONGS], char* file_name);
 void parse_sound(const char* filepath, SoundMeta* sound, ma_engine* engine);
+
+
+void reload_music_dir(int* song_count, Node* songbook[MAX_SONGS]);
 
 
 bool btn_pressed(Vector2 mouse_pos, Rectangle* btn);

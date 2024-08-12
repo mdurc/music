@@ -7,6 +7,8 @@
 #define MINIAUDIO_IMPLEMENTATION
 #include "scene_manager.h"
 
+ma_engine engine;
+
 int hash_f(char* file_name){
     int i, hash = 7;
     for(i=0; i<256 && file_name[i]!='\0'; ++i){
@@ -80,6 +82,7 @@ void parse_sound(const char* filepath, SoundMeta* sound, ma_engine* engine) {
     }
 
     sound->favorite = 0;
+    sound->initialized = 1;
 }
 
 
@@ -105,7 +108,7 @@ void clear_mem(Node* songbook[MAX_SONGS]){
 
 
 void load_songs_from_directory( const char* dir_path, Node* songbook[MAX_SONGS],
-                                Node* song_list, ma_engine* engine, int* song_count) {
+                                ma_engine* engine, int* song_count) {
     DIR *dir;
     struct dirent *entry;
     char file_path[1035];
@@ -138,6 +141,13 @@ void load_songs_from_directory( const char* dir_path, Node* songbook[MAX_SONGS],
     closedir(dir);
 }
 
+
+void reload_music_dir(int* song_count, Node* songbook[MAX_SONGS]){
+    *song_count = 0;
+    clear_mem(songbook);
+    load_songs_from_directory("music/", songbook, &engine, song_count);
+}
+
 int main(){
 
     int i;
@@ -145,8 +155,6 @@ int main(){
     for(i=0; i<MAX_SONGS; ++i){
         songbook[i] = NULL;
     }
-
-    Node* song_list = NULL;
 
     const int WIDTH = 800;
     const int HEIGHT = 450;
@@ -165,9 +173,9 @@ int main(){
 
     //  =======
     // MINIAUDIO_IMPLEMENTATION
-    SoundMeta* current_song;
+    SoundMeta* current_song = malloc(sizeof(SoundMeta));
+    current_song->initialized = 0;
     ma_result result;
-    ma_engine engine;
 
     result = ma_engine_init(NULL, &engine);
     if (result != MA_SUCCESS) { 
@@ -183,10 +191,10 @@ int main(){
     SetTargetFPS(60);
     Font font = LoadFont("/Users/mdurcan/Library/Fonts/UbuntuMono-B.ttf");
 
-    load_songs_from_directory("music/", songbook, song_list, &engine, &song_count);
-    current_song = find(songbook, "Lemon.mp3");
 
     sample_rate = engine.sampleRate;
+
+    reload_music_dir(&song_count, songbook);
 
     init_scrn_manager(WIDTH, HEIGHT, &song_count);
 
@@ -201,7 +209,7 @@ int main(){
         BeginDrawing();
         ClearBackground((Color){20, 20, 20, 255});
 
-        draw_scene(font, songbook, mouse_pos, &current_song, &playing);
+        draw_scene(&font, songbook, mouse_pos, &current_song, &playing);
         draw_scrub_player(&font, mouse_pos, play_btn_center, play_btn_radius, &playback_line, progress, playing, current_song);
 
         EndDrawing();
