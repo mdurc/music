@@ -10,7 +10,7 @@
 int hash_f(char* file_name){
     int i, hash = 7;
     for(i=0; i<256 && file_name[i]!='\0'; ++i){
-        hash = abs(hash*31 + file_name[i]);
+        hash = abs(hash*31 + tolower((unsigned char)file_name[i]));
     }
     return hash % MAX_SONGS;
 }
@@ -32,7 +32,7 @@ SoundMeta* find(Node* songbook[MAX_SONGS], char* file_name){
     int hash = hash_f(file_name);
     Node* temp = songbook[hash];
     while(temp){
-        if(strcmp(temp->meta->file_name, file_name)==0){
+        if(strcasecmp(temp->meta->file_name, file_name)==0){
             return temp->meta;
         }
         temp = temp->next;
@@ -196,12 +196,12 @@ int main(){
         handle_audio(mouse_pos, play_btn_center, play_btn_radius, &playback_line,
                 &playing, &progress, &dragging_scrubber, current_song, sample_rate);
 
-        update_scrn_manager(mouse_pos, &current_song, &playing);
+        update_scrn_manager(mouse_pos);
 
         BeginDrawing();
         ClearBackground((Color){20, 20, 20, 255});
 
-        draw_scene(font, songbook, mouse_pos);
+        draw_scene(font, songbook, mouse_pos, &current_song, &playing);
         draw_scrub_player(&font, mouse_pos, play_btn_center, play_btn_radius, &playback_line, progress, playing, current_song);
 
         EndDrawing();
