@@ -16,10 +16,17 @@ typedef struct{
     char file_size[64];
     float duration;
     bool favorite;
-    bool initialized;
 
     ma_sound audio;
 } SoundMeta;
+
+
+typedef struct {
+    SoundMeta* songs[MAX_SONGS];
+    SoundMeta* current_song; // points to a song inside of songs[MAX_SONGS]
+    int size;
+    bool playing;
+} AllSongs;
 
 typedef struct {
     SoundMeta* songs[MAX_QUEUE];
@@ -29,25 +36,17 @@ typedef struct {
 typedef struct {
     char name[MAX_FNAME_LEN];
     SoundMeta* songs[MAX_SONGS];
-    int song_count;
+    int size;
 } Playlist;
 
 
-// For hashtable of songs
-typedef struct Node {
-    SoundMeta* meta;
-    struct Node* next; // for collisions, a linked list
-} Node;
 
-
-int hash_f(char* file_name);
-void add(Node* songbook[MAX_SONGS], SoundMeta* sound);
-SoundMeta* find(Node* songbook[MAX_SONGS], char* file_name);
+SoundMeta* find(AllSongs* songbook, char* file_name);
 void parse_sound(const char* filepath, const char* filename, SoundMeta* sound, ma_engine* engine);
 
 void remove_from_queue(Queue* queue, int i);
 
-void reload_music_dir(int* song_count, Node* songbook[MAX_SONGS]);
+void reload_music_dir(AllSongs* songbook);
 
 
 bool btn_pressed(Vector2 mouse_pos, Rectangle* btn);

@@ -9,35 +9,15 @@
 
 ma_engine engine;
 
-int hash_f(char* file_name){
-    int i, hash = 7;
-    for(i=0; i<256 && file_name[i]!='\0'; ++i){
-        hash = abs(hash*31 + tolower((unsigned char)file_name[i]));
-    }
-    return hash % MAX_SONGS;
-}
 
-
-void add(Node* songbook[MAX_SONGS], SoundMeta* sound){
-    int hash = hash_f(sound->file_name);
-    printf("Hash: %d\n", hash);
-
-    // add it to the front of the ll
-    Node* temp = malloc(sizeof(Node));
-    temp->meta = sound;
-    temp->next = songbook[hash];
-    songbook[hash] = temp;
-}
-
-
-SoundMeta* find(Node* songbook[MAX_SONGS], char* file_name){
-    int hash = hash_f(file_name);
-    Node* temp = songbook[hash];
-    while(temp){
-        if(strcasecmp(temp->meta->file_name, file_name)==0){
-            return temp->meta;
+SoundMeta* find(AllSongs* songbook, char* file_name){
+    int i;
+    SoundMeta* temp;
+    for(i=0;i<songbook->size;++i){
+        if(strcasecmp(songbook->songs[i]->file_name, file_name) == 0 &&
+    strlen(songbook->songs[i]->file_name) == strlen(file_name)){
+            return songbook->songs[i];
         }
-        temp = temp->next;
     }
     return NULL;
 }
@@ -82,7 +62,6 @@ void parse_sound(const char* filepath, const char* filename, SoundMeta* sound, m
     sound->file_name[sizeof(sound->file_name) - 1] = '\0';
 
     sound->favorite = 0;
-    sound->initialized = 1;
 }
 
 
@@ -93,23 +72,17 @@ bool btn_pressed(Vector2 mouse_pos, Rectangle* btn){
 
 
 
-void delete_list(Node* n){
-    if(!n) return;
-    delete_list(n->next);
-    free(n->meta);
-    free(n);
-}
-void clear_mem(Node* songbook[MAX_SONGS]){
+// TODO: do this
+void clear_mem(AllSongs* songbook){
     int i;
     for(i=0;i<MAX_SONGS;++i){
-        delete_list(songbook[i]);
-        songbook[i] = NULL;
+        //free(songbook[i]);
     }
 }
 
 
-void load_songs_from_directory( const char* dir_path, Node* songbook[MAX_SONGS],
-                                ma_engine* engine, int* song_count) {
+void load_songs_from_directory( const char* dir_path, AllSongs* songbook,
+                                ma_engine* engine) {
     DIR *dir;
     struct dirent *entry;
     char file_path[1035];
@@ -141,13 +114,13 @@ void load_songs_from_directory( const char* dir_path, Node* songbook[MAX_SONGS],
             }
 
             if(find(songbook, filename) == NULL){
-                printf("Adding new song #%d: %s, ",i, filename);
+                printf("Adding new song #%d: %s\n",i, filename);
                 SoundMeta* new_song = malloc(sizeof(SoundMeta));
                 if (new_song == NULL) { perror("malloc"); continue; }
 
                 parse_sound(file_path, filename, new_song, engine);
-                add(songbook, new_song);
-                ++(*song_count);
+                songbook->songs[songbook->size] = new_song;
+                ++songbook->size;
             }
         }
     }
@@ -156,16 +129,16 @@ void load_songs_from_directory( const char* dir_path, Node* songbook[MAX_SONGS],
 }
 
 
-void reload_music_dir(int* song_count, Node* songbook[MAX_SONGS]){
-    printf("SONG COUNT: %d\n", *song_count);
-    load_songs_from_directory("music/", songbook, &engine, song_count);
-    printf("NEW SONG COUNT: %d\n", *song_count);
+void reload_music_dir(AllSongs* songbook){
+    printf("SONG COUNT: %d\n", songbook->size);
+    load_songs_from_directory("music/", songbook, &engine);
+    printf("NEW SONG COUNT: %d\n", songbook->size);
 }
 
 int main(){
 
     int i;
-    Node* songbook[MAX_SONGS];
+    AllSongs songbook;
     Queue queue;
     Playlist* playlists[MAX_PLAYLISTS];
 
@@ -173,9 +146,7 @@ int main(){
     const int WIDTH = 800;
     const int HEIGHT = 450;
     float progress=0.0f;
-    bool playing = 0;
     bool dragging_scrubber = 0;
-    int song_count=0;
     unsigned int sample_rate;
 
 
@@ -187,8 +158,6 @@ int main(){
 
     //  =======
     // MINIAUDIO_IMPLEMENTATION
-    SoundMeta* current_song = malloc(sizeof(SoundMeta));
-    current_song->initialized = 0;
     ma_result result;
 
     result = ma_engine_init(NULL, &engine);
@@ -210,14 +179,17 @@ int main(){
 
     // INITILIZE
     for(i=0; i<MAX_SONGS; ++i){
-        songbook[i] = NULL;
+        songbook.songs[i] = NULL;
         if(i<MAX_QUEUE) queue.songs[i] = NULL;
         if(i<MAX_PLAYLISTS) playlists[i] = NULL;
     }
+    songbook.size = 0;
+    songbook.current_song = NULL;
+    songbook.playing = false;
     queue.size = 0;
-    reload_music_dir(&song_count, songbook);
+    reload_music_dir(&songbook);
 
-    init_scrn_manager(WIDTH, HEIGHT, &song_count);
+    init_scrn_manager(WIDTH, HEIGHT);
 
 
 
@@ -225,20 +197,20 @@ int main(){
         mouse_pos = GetMousePosition();
 
         handle_audio(mouse_pos, play_btn_center, play_btn_radius, &playback_line,
-                &playing, &progress, &dragging_scrubber, current_song, sample_rate);
+                &songbook.playing, &progress, &dragging_scrubber, songbook.current_song, sample_rate);
 
         update_scrn_manager(mouse_pos);
 
         BeginDrawing();
         ClearBackground((Color){20, 20, 20, 255});
 
-        draw_scene(&font, songbook, &queue, mouse_pos, &current_song, &playing);
-        draw_scrub_player(&font, mouse_pos, play_btn_center, play_btn_radius, &playback_line, progress, playing, current_song);
+        draw_scene(&font, &songbook, &queue, mouse_pos);
+        draw_scrub_player(&font, mouse_pos, play_btn_center, play_btn_radius, &playback_line, progress, songbook.playing, songbook.current_song);
 
         EndDrawing();
     }
 
-    clear_mem(songbook);
+    clear_mem(&songbook);
     ma_engine_uninit(&engine);
     CloseWindow();
 

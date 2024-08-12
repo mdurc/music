@@ -15,8 +15,8 @@ typedef struct {
     SoundMeta* meta;
 } SongButton;
 
-void init_scrn_manager(const int WIDTH, const int HIEGHT, int* total_songs);
+void init_scrn_manager(const int WIDTH, const int HIEGHT);
 void update_scrn_manager(Vector2 mouse_pos);
-void draw_scene(Font* font, Node* songbook[MAX_SONGS], Queue* queue, Vector2 mouse_pos, SoundMeta** current_song, bool* playing);
+void draw_scene(Font* font, AllSongs* songbook, Queue* queue, Vector2 mouse_pos);
 
 #endif

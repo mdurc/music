@@ -17,8 +17,6 @@ SceneType current_scene = SCENE_HOME;
 int g_width, g_height;
 
 float g_scrollOffset = 0.0f;
-int* song_count;
-
 
 // For search
 char input_buf[MAX_INPUT_CHARS + 1] = "\0"; // plus one for null terminating character
@@ -32,16 +30,13 @@ bool flag_download_complete = false;
 bool flag_download_failed = false;
 
 void draw_sidebar();
-void draw_home(Font* font, Node* songbook[MAX_SONGS], Queue* queue, Vector2 mouse_pos, SoundMeta** current_song, bool* playing);
-void draw_library(Font* font, Node* songbook[MAX_SONGS]);
-void draw_download(Font* font, Node* songbook[MAX_SONGS], Vector2 mouse_pos);
+void draw_home(Font* font, AllSongs* songbook, Queue* queue, Vector2 mouse_pos);
+void draw_library(Font* font, AllSongs* songbook);
+void draw_download(Font* font, AllSongs* songbook, Vector2 mouse_pos);
 
 
 
-void init_scrn_manager(const int WIDTH, const int HIEGHT, int* total_songs){
-    g_width = WIDTH; g_height = HIEGHT; 
-    song_count = total_songs;
-}
+void init_scrn_manager(const int WIDTH, const int HIEGHT){ g_width = WIDTH; g_height = HIEGHT; }
 
 void update_scrn_manager(Vector2 mouse_pos){
     if (btn_pressed(mouse_pos, &home)) {
@@ -62,11 +57,11 @@ void update_scrn_manager(Vector2 mouse_pos){
     }
 }
 
-void draw_scene(Font* font, Node* songbook[MAX_SONGS], Queue* queue, Vector2 mouse_pos, SoundMeta** current_song, bool* playing){
+void draw_scene(Font* font, AllSongs* songbook, Queue* queue, Vector2 mouse_pos){
     draw_sidebar();
     switch (current_scene) {
         case SCENE_HOME:
-            draw_home(font, songbook, queue, mouse_pos, current_song, playing);
+            draw_home(font, songbook, queue, mouse_pos);
             break;
         case SCENE_LIBRARY:
             draw_library(font, songbook);
@@ -91,75 +86,69 @@ void draw_sidebar(){
 }
 
 
-void song_scroll(Font* font, Node* songbook[MAX_SONGS], Queue* queue, int len_book, int total_songs, bool chaining,
-        Vector2 mouse_pos, SoundMeta** current_song, bool* playing, int x, int y, int VISIBLE_ITEMS) {
+void song_scroll(Font* font, AllSongs* songbook, Queue* queue,
+        Vector2 mouse_pos, int x, int y, int VISIBLE_ITEMS) {
     const float scrollSpeed = 4.0f;
 
-    float max_scroll = total_songs;
+    float max_scroll = songbook->size;
     int gap = 5;
     int i, startY, visible_item_len = VISIBLE_ITEMS*(ITEM_HEIGHT+gap);
-    Node* temp;
+    SoundMeta* temp;
 
     max_scroll = max_scroll*(ITEM_HEIGHT+gap) - visible_item_len + ITEM_HEIGHT;
     if (max_scroll < 0) max_scroll = 0;
 
-    if(total_songs >= VISIBLE_ITEMS) g_scrollOffset -= GetMouseWheelMove() * scrollSpeed;
+    if(songbook->size >= VISIBLE_ITEMS) g_scrollOffset -= GetMouseWheelMove() * scrollSpeed;
 
     if (g_scrollOffset < 0) g_scrollOffset = 0;
     if (g_scrollOffset > max_scroll) g_scrollOffset = max_scroll;
 
     startY = -g_scrollOffset;
 
-    for(i=0; i<len_book; ++i){
-        temp = songbook[i];
-        while(temp){
-            if (startY >= -ITEM_HEIGHT && startY < visible_item_len-ITEM_HEIGHT) {
+    for(i=0; i<songbook->size; ++i){
+        temp = songbook->songs[i];
+        if (startY >= -ITEM_HEIGHT && startY < visible_item_len-ITEM_HEIGHT) {
 
-                Rectangle rect = { g_width / 4.0f + x, startY + 10 + y, g_width / 2.0f, ITEM_HEIGHT };
+            Rectangle rect = { g_width / 4.0f + x, startY + 10 + y, g_width / 2.0f, ITEM_HEIGHT };
 
-                
-                if(CheckCollisionPointRec(mouse_pos, rect)){
-                    DrawRectangleRec(rect, GRAY);
+            if(CheckCollisionPointRec(mouse_pos, rect)){
+                DrawRectangleRec(rect, GRAY);
 
-                    if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
-                        printf("Changing song to: %s\n", temp->meta->file_name);
-                        if((*current_song)->initialized){
-                            ma_sound_stop(&(*current_song)->audio);
-                        }
-                        *current_song = temp->meta;
-                        // restart the song and then play it
-                        ma_sound_seek_to_pcm_frame(&(*current_song)->audio, 0);
-                        ma_sound_start(&(*current_song)->audio);
-                        *playing = 1;
-                    }else if(IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && queue!=NULL){
-                        // ADD TO QUEUE
-                        for(i=0;i<queue->size;++i){
-                            if(queue->songs[i]->file_name == temp->meta->file_name){
-                                printf("Removing %s from queue\n", temp->meta->file_name);
-                                remove_from_queue(queue, i);
-                                i=-1;
-                                break;
-                            }
-                        }
-                        if(i!=-1){
-                            printf("Added song to queue: %s\n", temp->meta->file_name);
-                            queue->songs[queue->size] = temp->meta;
-                            ++queue->size;
+                if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
+                    printf("Changing song to: %s\n", temp->file_name);
+                    if(songbook->current_song){
+                        ma_sound_stop(&songbook->current_song->audio);
+                    }
+                    songbook->current_song = temp;
+
+                    // restart the song and then play it
+                    ma_sound_seek_to_pcm_frame(&songbook->current_song->audio, 0);
+                    ma_sound_start(&songbook->current_song->audio);
+                    songbook->playing = 1;
+                }else if(IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && queue!=NULL){
+                    // ADD TO QUEUE
+                    for(i=0;i<queue->size;++i){
+                        if(queue->songs[i]->file_name == temp->file_name){
+                            printf("Removing %s from queue\n", temp->file_name);
+                            remove_from_queue(queue, i);
+                            i=-1;
+                            break;
                         }
                     }
-                } else {
-                    DrawRectangleRec(rect, DARKGRAY);
+                    if(i!=-1){
+                        printf("Added song to queue: %s\n", temp->file_name);
+                        queue->songs[queue->size] = temp;
+                        ++queue->size;
+                    }
                 }
-                DrawTextEx(*font, temp->meta->file_name, 
+            } else {
+                DrawRectangleRec(rect, DARKGRAY);
+            }
+            DrawTextEx(*font, temp->file_name, 
                     (Vector2){g_width / 4.0f + 10 + x, startY + 20 + y}, 
                     20, 2, WHITE);
-            }
-            startY += ITEM_HEIGHT+gap;
-
-            if(chaining) temp = temp->next;
-            else temp = NULL;
         }
-
+        startY += ITEM_HEIGHT+gap;
         // we found all the songs we need for now
         if(startY > visible_item_len-ITEM_HEIGHT){ break; }
     }
@@ -250,7 +239,7 @@ void draw_search_bar(Font* font, Rectangle* search_bar){
 
 
 
-void draw_download(Font* font, Node* songbook[MAX_SONGS], Vector2 mouse_pos) {
+void draw_download(Font* font, AllSongs* songbook, Vector2 mouse_pos) {
     int i, y_offset;
     char cmd[150 + MAX_INPUT_CHARS];
     Rectangle search_bar = {(g_width-400)/2.0f, 60, 400, 40};
@@ -269,7 +258,7 @@ void draw_download(Font* font, Node* songbook[MAX_SONGS], Vector2 mouse_pos) {
             flag_download_complete = 1;
             flag_download_failed = 0;
 
-            reload_music_dir(song_count, songbook);
+            reload_music_dir(songbook);
         }else{
             flag_download_complete = 0;
             flag_download_failed = 1;
@@ -293,65 +282,58 @@ void draw_download(Font* font, Node* songbook[MAX_SONGS], Vector2 mouse_pos) {
     }
 }
 
-void draw_library(Font* font, Node* songbook[MAX_SONGS]) {
+void draw_library(Font* font, AllSongs* songbook) {
 
 }
 
 
 
-void draw_home(Font* font, Node* songbook[MAX_SONGS], Queue* queue, Vector2 mouse_pos, SoundMeta** current_song, bool* playing) {
+void draw_home(Font* font, AllSongs* songbook, Queue* queue, Vector2 mouse_pos) {
 
-    int i, matches;
-    Node* temp;
-    Node** match_list;
-    SoundMeta* song_p;
+    int i;
+    AllSongs match_list;
+    SoundMeta* temp;
 
-    matches = 0;
-    match_list = NULL;
-
+    match_list.size = 0;
     if (letter_count > 0) {
-        for(i=0;i<MAX_SONGS;++i){
-            temp = songbook[i];
-            while (temp) {
-                if (strcasestr(temp->meta->file_name, input_buf) != NULL) {
-                    match_list = realloc(match_list, (matches + 1) * sizeof(Node*));
-                    match_list[matches] = temp;
-                    ++matches;
-                }
-                temp = temp->next;
+        for(i=0;i<songbook->size;++i){
+            temp = songbook->songs[i];
+            if (strcasestr(temp->file_name, input_buf) != NULL) {
+                match_list.songs[match_list.size] = temp;
+                ++match_list.size;
             }
         }
         // maximum of 5 results at a time
-        song_scroll(font, match_list, queue, matches, matches, false, mouse_pos, current_song, playing, 0, 100, 5);
+        song_scroll(font, &match_list, queue, mouse_pos, 0, 100, 5);
     }else{
-        song_scroll(font, songbook, queue, MAX_SONGS, *song_count, true, mouse_pos, current_song, playing, 0, 100, 5);
+        song_scroll(font, songbook, queue, mouse_pos, 0, 100, 5);
     }
 
     Rectangle search_bar = {(g_width-400)/2.0f, 20, 400, 40};
     // check if KEY_ENTER was pressed
     if(create_search_bar(&search_bar, mouse_pos)){
         printf("Searching for: %s\n", input_buf);
-        song_p = find(songbook, input_buf);
+        temp = find(songbook, input_buf);
 
-        if((song_p || matches==1) && (*current_song)->initialized && ma_sound_is_playing(&(*current_song)->audio)){
-            ma_sound_stop(&(*current_song)->audio);
+        if((temp || match_list.size==1) && songbook->current_song && ma_sound_is_playing(&songbook->current_song->audio)){
+            ma_sound_stop(&songbook->current_song->audio);
         }
 
-        if(song_p){
+        if(temp){
             printf("Found\n");
-            *current_song = song_p;
-        }else if(matches==1){
+            songbook->current_song = temp;
+        }else if(match_list.size==1){
             printf("Playing top pick\n");
-            *current_song = match_list[0]->meta;
+            songbook->current_song = match_list.songs[0];
         }else{
             printf("Not found\n");
         }
 
-        if(song_p || matches==1){
+        if(temp || match_list.size==1){
             // restart the song and then play it
-            ma_sound_seek_to_pcm_frame(&(*current_song)->audio, 0);
-            ma_sound_start(&(*current_song)->audio);
-            *playing = 1;
+            ma_sound_seek_to_pcm_frame(&songbook->current_song->audio, 0);
+            ma_sound_start(&songbook->current_song->audio);
+            songbook->playing = 1;
         }
     }
 
