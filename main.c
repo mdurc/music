@@ -135,7 +135,47 @@ void reload_music_dir(AllSongs* songbook){
     printf("NEW SONG COUNT: %d\n", songbook->size);
 }
 
+void next_in_queue(AllSongs* songbook, AllSongs* queue){
+    if(queue->size > 0){
+        printf("Playing next song in queue: %s\n", queue->songs[0]->file_name);
+
+        if(ma_sound_is_playing(&songbook->current_song->audio)) ma_sound_stop(&songbook->current_song->audio);
+        songbook->current_song = queue->songs[0];
+        if(songbook->playing){ usleep(400000); ma_sound_start(&songbook->current_song->audio); }
+
+        remove_from_queue(queue, 0);
+    }else if(songbook->size > 0){
+        if(ma_sound_is_playing(&songbook->current_song->audio)) ma_sound_stop(&songbook->current_song->audio);
+        songbook->current_song = songbook->songs[rand()%songbook->size];
+        if(songbook->playing){ usleep(400000); ma_sound_start(&songbook->current_song->audio); }
+
+        printf("Playing random song: %s\n", songbook->current_song->file_name);
+    }else{
+        printf("No songs to go to\n");
+    }
+}
+
+void handle_arrows(Vector2 mouse_pos, Vector2 text_size, Vector2 left_arrow_pos, Vector2 right_arrow_pos, AllSongs* songbook, AllSongs* queue){
+    bool left_arrow_pressed, right_arrow_pressed;
+    float new_time;
+
+    left_arrow_pressed = (mouse_pos.x >= left_arrow_pos.x) && (mouse_pos.x <= left_arrow_pos.x + text_size.x) &&
+                              (mouse_pos.y >= left_arrow_pos.y) && (mouse_pos.y <= left_arrow_pos.y + text_size.y);
+    right_arrow_pressed = (mouse_pos.x >= right_arrow_pos.x) && (mouse_pos.x <= right_arrow_pos.x + text_size.x) &&
+                               (mouse_pos.y >= right_arrow_pos.y) && (mouse_pos.y <= right_arrow_pos.y + text_size.y);
+    if (left_arrow_pressed && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        if(ma_sound_is_playing(&songbook->current_song->audio)) ma_sound_stop(&songbook->current_song->audio);
+        ma_sound_seek_to_pcm_frame(&songbook->current_song->audio, 0.0f);
+        if(songbook->playing){ usleep(400000); ma_sound_start(&songbook->current_song->audio); }
+    }
+    else if (right_arrow_pressed && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+        next_in_queue(songbook, queue);
+    }
+}
+
 int main(){
+
+    srand(time(NULL));
 
     int i;
     AllSongs songbook;
@@ -175,6 +215,11 @@ int main(){
     Font font = LoadFont("/Users/mdurcan/Library/Fonts/UbuntuMono-B.ttf");
 
 
+    Vector2 text_size = MeasureTextEx(font, "->", 20, 1);
+    Vector2 left_arrow_pos = (Vector2){play_btn_center.x - play_btn_radius*2 - text_size.x, play_btn_center.y - text_size.y/2.0f};
+    Vector2 right_arrow_pos = (Vector2){play_btn_center.x + play_btn_radius*2, play_btn_center.y - text_size.y/2.0f};
+
+
     sample_rate = engine.sampleRate;
 
     // INITILIZE
@@ -196,8 +241,11 @@ int main(){
     while (!WindowShouldClose()) {
         mouse_pos = GetMousePosition();
 
-        handle_audio(mouse_pos, play_btn_center, play_btn_radius, &playback_line,
+        handle_audio(mouse_pos, play_btn_center, play_btn_radius, left_arrow_pos, right_arrow_pos, &playback_line,
                 &songbook.playing, &progress, &dragging_scrubber, songbook.current_song, sample_rate);
+        handle_arrows(mouse_pos, text_size, left_arrow_pos, right_arrow_pos, &songbook, &queue);
+
+        if(progress == 1) next_in_queue(&songbook, &queue);
 
         update_scrn_manager(mouse_pos);
 
@@ -205,7 +253,7 @@ int main(){
         ClearBackground((Color){20, 20, 20, 255});
 
         draw_scene(&font, &songbook, &queue, mouse_pos);
-        draw_scrub_player(&font, mouse_pos, play_btn_center, play_btn_radius, &playback_line, progress, songbook.playing, songbook.current_song);
+        draw_scrub_player(&font, mouse_pos, play_btn_center, play_btn_radius, left_arrow_pos, right_arrow_pos, &playback_line, progress, songbook.playing, songbook.current_song);
 
         EndDrawing();
     }

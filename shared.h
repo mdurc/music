@@ -46,13 +46,11 @@ void reload_music_dir(AllSongs* songbook);
 bool btn_pressed(Vector2 mouse_pos, Rectangle* btn);
 
 void draw_scrub_player(Font* font, Vector2 mouse_pos, Vector2 play_btn_center,
-        float play_btn_radius, Rectangle* playback_line, float progress,
+        float play_btn_radius, Vector2 left_arrow_pos, Vector2 right_arrow_pos, Rectangle* playback_line, float progress,
         bool playing, SoundMeta* sound);
-void check_play_btn_pressed(Vector2 mouse_pos, Vector2 play_btn_center,
-        float play_btn_radius, bool* playing, ma_sound* aud);
 void check_adjust_scrubber(Vector2 mouse_pos, Rectangle* playback_line, bool* dragging_scrubber,
             bool playing, SoundMeta* sound, unsigned int sample_rate);
-void handle_audio(Vector2 mouse_pos, Vector2 play_btn_center, float play_btn_radius,
+void handle_audio(Vector2 mouse_pos, Vector2 play_btn_center, float play_btn_radius, Vector2 left_arrow_pos, Vector2 right_arrow_pos,
         Rectangle* playback_line, bool* playing, float* progress,
         bool* dragging_scrubber, SoundMeta* sound, unsigned int sample_rate);
 

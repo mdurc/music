@@ -5,7 +5,9 @@
 
 #include "shared.h"
 
-void draw_scrub_player(Font* font, Vector2 mouse_pos, Vector2 play_btn_center, float play_btn_radius, Rectangle* playback_line, float progress, bool playing, SoundMeta* sound){
+void draw_scrub_player(Font* font, Vector2 mouse_pos, Vector2 play_btn_center,
+        float play_btn_radius, Vector2 left_arrow_pos, Vector2 right_arrow_pos, Rectangle* playback_line, float progress,
+        bool playing, SoundMeta* sound){
     char time_stamps[10];
     char* play_text;
     Vector2 text_size;
@@ -19,9 +21,9 @@ void draw_scrub_player(Font* font, Vector2 mouse_pos, Vector2 play_btn_center, f
     text_size = MeasureTextEx(*font, play_text, 20, 1);
     DrawTextEx(*font, play_text, (Vector2){play_btn_center.x - text_size.x/2.0f, play_btn_center.y - text_size.y/2.0f}, 20, 1, BLACK);
 
-    text_size = MeasureTextEx(*font, "<-", 20, 1);
-    DrawTextEx(*font, "<-", (Vector2){play_btn_center.x - play_btn_radius*2 - text_size.x, play_btn_center.y - text_size.y/2.0f}, 20, 1, WHITE);
-    DrawTextEx(*font, "->", (Vector2){play_btn_center.x + play_btn_radius*2, play_btn_center.y - text_size.y/2.0f}, 20, 1, WHITE);
+    DrawTextEx(*font, "<-", left_arrow_pos, 20, 1, WHITE);
+    DrawTextEx(*font, "->", right_arrow_pos, 20, 1, WHITE);
+
 
     DrawRectangleRounded(*playback_line, 0.5f, 8, GRAY);
     DrawRectangleRounded((Rectangle){playback_line->x, playback_line->y, playback_line->width * progress, playback_line->height}, 0.5f, 8, WHITE);
@@ -39,17 +41,6 @@ void draw_scrub_player(Font* font, Vector2 mouse_pos, Vector2 play_btn_center, f
     //DrawTextEx(*font, TextFormat("%s", play_text), (Vector2){playback_line->width-20, playback_line->y-30}, 20, 1, WHITE);
 }
 
-void check_play_btn_pressed(Vector2 mouse_pos, Vector2 play_btn_center, float play_btn_radius, bool* playing, ma_sound* aud){
-    if(CheckCollisionPointCircle(mouse_pos, play_btn_center, play_btn_radius) &&
-            IsMouseButtonPressed(MOUSE_LEFT_BUTTON)){
-        if (!(*playing)) {
-            ma_sound_start(aud);
-        } else {
-            ma_sound_stop(aud);
-        }
-        *playing = !(*playing);
-    }
-}
 
 void check_adjust_scrubber(Vector2 mouse_pos, Rectangle* playback_line, bool* dragging_scrubber,
             bool playing, SoundMeta* sound, unsigned int sample_rate){
@@ -72,11 +63,22 @@ void check_adjust_scrubber(Vector2 mouse_pos, Rectangle* playback_line, bool* dr
 
 }
 
-void handle_audio(Vector2 mouse_pos, Vector2 play_btn_center, float play_btn_radius,
-        Rectangle* playback_line, bool* playing, float* progress, bool* dragging_scrubber, SoundMeta* sound, unsigned int sample_rate){
+void handle_audio(Vector2 mouse_pos, Vector2 play_btn_center, float play_btn_radius, Vector2 left_arrow_pos, Vector2 right_arrow_pos,
+        Rectangle* playback_line, bool* playing, float* progress,
+        bool* dragging_scrubber, SoundMeta* sound, unsigned int sample_rate){
     if(sound == NULL) return;
 
-    check_play_btn_pressed(mouse_pos, play_btn_center, play_btn_radius, playing, &sound->audio);
+    // check play btn
+    if(CheckCollisionPointCircle(mouse_pos, play_btn_center, play_btn_radius) &&
+            IsMouseButtonPressed(MOUSE_LEFT_BUTTON)){
+        if (!(*playing)) {
+            ma_sound_start(&sound->audio);
+        } else {
+            ma_sound_stop(&sound->audio);
+        }
+        *playing = !(*playing);
+    }
+
 
     check_adjust_scrubber(mouse_pos, playback_line, dragging_scrubber,
             *playing, sound, sample_rate);
@@ -84,8 +86,4 @@ void handle_audio(Vector2 mouse_pos, Vector2 play_btn_center, float play_btn_rad
     // update the progress
     ma_sound_get_cursor_in_seconds(&sound->audio, progress);
     *progress = *progress / sound->duration;
-    
-    // TODO: check if progress is complete
-    // TODO: QUEUE
-    // TODO: PLAY NEXT IN QUEUE
 }
