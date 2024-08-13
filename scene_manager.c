@@ -1,4 +1,5 @@
 #include "scene_manager.h"
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -28,9 +29,12 @@ bool mouse_on_search = false;
 bool flag_download_complete = false;
 bool flag_download_failed = false;
 
+
+bool is_popup_open = false;
+
 void draw_sidebar();
-void draw_home(Font* font, AllSongs* songbook, AllSongs* queue, Playlist* playlists, Vector2 mouse_pos);
-void draw_library(Font* font, AllSongs* songbook, Playlist* playlists, Vector2 mouse_pos);
+void draw_home(Font* font, AllSongs* songbook, AllSongs* queue, Playlist* playlists[MAX_PLAYLISTS], Vector2 mouse_pos);
+void draw_library(Font* font, AllSongs* songbook, Playlist* playlists[MAX_PLAYLISTS], Vector2 mouse_pos);
 void draw_download(Font* font, AllSongs* songbook, Vector2 mouse_pos);
 
 
@@ -56,7 +60,7 @@ void update_scrn_manager(Vector2 mouse_pos){
     }
 }
 
-void draw_scene(Font* font, AllSongs* songbook, AllSongs* queue, Playlist* playlists, Vector2 mouse_pos){
+void draw_scene(Font* font, AllSongs* songbook, AllSongs* queue, Playlist* playlists[MAX_PLAYLISTS], Vector2 mouse_pos){
     draw_sidebar();
     switch (current_scene) {
         case SCENE_HOME:
@@ -100,11 +104,11 @@ bool found_in_playlist(Playlist* playlist, char name[MAX_FNAME_LEN]){
 
 // include songbook for current_song and is_playing.
 // song_list_to_show is for what songs are shown on the list
-void song_scroll(Font* font, AllSongs* songbook, AllSongs* queue, Playlist* playlists,
+void song_scroll(Font* font, AllSongs* songbook, AllSongs* queue, Playlist* playlists[MAX_PLAYLISTS],
         Vector2 mouse_pos, int x, int y, int ITEM_HEIGHT, int VISIBLE_ITEMS, bool disable_scroll) {
     const float scrollSpeed = 4.0f;
 
-    int num_songs_shown = playlists[songbook->playlist].size;
+    int num_songs_shown = playlists[songbook->playlist]->size;
 
     float max_scroll = num_songs_shown;
 
@@ -127,7 +131,7 @@ void song_scroll(Font* font, AllSongs* songbook, AllSongs* queue, Playlist* play
         temp = songbook->songs[i];
 
         // !disable_scroll means that we are in the queue. We dont want to validate the queue
-        if(!found_in_playlist(&playlists[songbook->playlist], temp->file_name)) continue;
+        if(!found_in_playlist(playlists[songbook->playlist], temp->file_name)) continue;
 
         if (startY >= -ITEM_HEIGHT && startY < visible_item_len-ITEM_HEIGHT) {
 
@@ -173,7 +177,7 @@ void song_scroll(Font* font, AllSongs* songbook, AllSongs* queue, Playlist* play
             }
             DrawTextEx(*font, temp->file_name, 
                     (Vector2){g_width / 4.0f + 10 + x, startY + ITEM_HEIGHT/2.0 + y + (disable_scroll?5:0)}, 
-                    ITEM_HEIGHT/2.0, 2, WHITE);
+                    ITEM_HEIGHT/2.0, 1, WHITE);
         }
         startY += ITEM_HEIGHT+gap;
         // we found all the songs we need for now
@@ -310,32 +314,48 @@ void draw_download(Font* font, AllSongs* songbook, Vector2 mouse_pos) {
     }
 }
 
-void draw_library(Font* font, AllSongs* songbook, Playlist* playlists, Vector2 mouse_pos) {
-    int i;
+void draw_library(Font* font, AllSongs* songbook, Playlist* playlists[MAX_PLAYLISTS], Vector2 mouse_pos) {
+    int i, key;
     int square_size = 80;
     int padding = 20;
     int x = 200;
     int y = 100;
     int font_size = 15;
+    bool removed_playlist_inframe = 0;
 
     Rectangle square;
     Vector2 text_size, text_position;
 
     // START at 1 because playlist 0 is a PLACEHOLDER
-    for(i=1; i<MAX_PLAYLISTS && playlists[i].size>0; ++i){
+    for(i=1; i<MAX_PLAYLISTS && playlists[i]!=NULL; ++i){
+        //printf("Name: %s, size:%d, index: %d\n", playlists[i].name, playlists[i].size, i);
         square.x = x; square.y = y;
         square.width = square_size; square.height = square_size;
 
-        text_size = MeasureTextEx(*font, playlists[i].name, font_size, 1);
+        text_size = MeasureTextEx(*font, playlists[i]->name, font_size, 1);
         text_position.x = square.x + (square.width - text_size.x) / 2;
         text_position.y = square.y + (square.height - text_size.y) / 2;
 
         DrawRectangleRounded(square, 0.5f, 8, DARKGRAY);
-        DrawTextEx(*font, playlists[i].name, text_position, font_size, 1, RAYWHITE);
+        DrawTextEx(*font, playlists[i]->name, text_position, font_size, 1, RAYWHITE);
 
-        if (CheckCollisionPointRec(mouse_pos, square) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-            songbook->playlist = i;
-            printf("Moving to playlist #%d\n", i);
+        if (CheckCollisionPointRec(mouse_pos, square)) {
+            if(IsMouseButtonPressed(MOUSE_LEFT_BUTTON)){
+                songbook->playlist = i;
+                printf("Moving to playlist #%d\n", i);
+            }else if(IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)){
+                //TODO: instead of right clicking everywhere, just add an elipses that opens an options popup to take different actions
+                if(strcmp(playlists[i]->name, "All Songs")==0 &&
+                    strlen(playlists[i]->name)==strlen("All Songs")){
+                    printf("Cannot remove \"All Songs\" playlist\n");
+                }else{
+                    remove_from_playlist(playlists, i);
+                    printf("Removing playlist\n");
+                    // we just removed the current index, so do --i and for-loop will do ++i to stay at same index
+                    --i;
+                    removed_playlist_inframe = 1;
+                }
+            }
         }
 
         x += square_size + padding;
@@ -345,7 +365,18 @@ void draw_library(Font* font, AllSongs* songbook, Playlist* playlists, Vector2 m
         }
     }
 
+
     // for adding a new playlist
+    // first check if we have already maxed out
+    for(i=0;i<MAX_PLAYLISTS && playlists[i]!=NULL;++i);
+
+    // if we just removed one, just wait until the next frame to add a new playlist
+    // this way the + button just seemlessly replaces the previously last playlist square
+    if(removed_playlist_inframe || i==MAX_PLAYLISTS){
+        //printf("Maximum playlist count has been reached: %d\n", i-1);
+        return;
+    }
+
     square.x = x; square.y = y;
     square.width = square_size; square.height = square_size;
     text_size = MeasureTextEx(*font, "+", font_size, 1);
@@ -356,31 +387,94 @@ void draw_library(Font* font, AllSongs* songbook, Playlist* playlists, Vector2 m
     DrawTextEx(*font, "+", text_position, font_size, 1, RAYWHITE);
     if (CheckCollisionPointRec(mouse_pos, square) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         printf("Adding new playlist\n");
-        //TODO: promt with a popup for playlist name
+        is_popup_open = true;
+        input_buf[0]='\0';
+        letter_count = 0;
+    }
+
+    if (is_popup_open) {
+        square.x = g_width/2.0 - 150;
+        square.y = g_height/2.0 - 50;
+        square.width = 300;
+        square.height = 100;
+        DrawRectangleRounded(square, 0.1f, 8, GRAY);
+
+        DrawTextEx(*font, "Enter playlist name:", (Vector2){square.x + 10, square.y + 10}, 20, 1, RAYWHITE);
+        DrawTextEx(*font, input_buf, (Vector2){square.x + 10, square.y + 40}, 20, 1, RAYWHITE);
+
+        key = GetCharPressed();
+
+        // check if more characters have been pressed on the same frame
+        assert(MAX_PLAYNAME < sizeof(input_buf)-1); // we dont want to overflow input_buf
+        while (key > 0){
+            // only allow keys within: [32..125]
+            if ((key >= 32) && (key <= 125) && (letter_count < MAX_PLAYNAME)){
+                input_buf[letter_count] = (char)key;
+                input_buf[++letter_count] = '\0';
+            }
+
+            // check next character in the queue
+            key = GetCharPressed();
+        }
+
+        // Handle backspace
+        if (IsKeyPressed(KEY_BACKSPACE) && letter_count > 0) {
+            input_buf[--letter_count] = '\0';
+        }
+
+        // Handle submission (e.g., pressing Enter)
+        if (IsKeyPressed(KEY_ENTER)) {
+            printf("Playlist name entered: %s\n", input_buf);
+            // see if there already exists a playlist with that name
+            for(i=0;i<MAX_PLAYLISTS && playlists[i]!=NULL;++i){
+                if( strcmp(playlists[i]->name, input_buf)==0 &&
+                    strlen(playlists[i]->name)==letter_count){
+                    printf("Playlist name already exists: %s\n", input_buf);
+                    // return before allocating and leaving the popup
+                    return;
+                }
+            }
+
+            // find the last playlist index
+            // Should still be stored in variable "i" from : for(i=0;i<MAX_PLAYLISTS && playlists[i]!=NULL;++i);
+            playlists[i] = malloc(sizeof(Playlist));
+
+            // init new playlist at index i
+            strcpy(playlists[i]->name, input_buf);
+            playlists[i]->size = 0;
+            playlists[i]->every_song = 0;
+
+            is_popup_open = false;
+        }
+
+        // TODO: diasable raylib exit application on ESC
+        if(IsKeyPressed(KEY_ESCAPE)) is_popup_open = false;
     }
 }
 
 
 
-void draw_home(Font* font, AllSongs* songbook, AllSongs* queue, Playlist* playlists, Vector2 mouse_pos) {
+void draw_home(Font* font, AllSongs* songbook, AllSongs* queue, Playlist* playlists[MAX_PLAYLISTS], Vector2 mouse_pos) {
 
     int i, temp_ind, match_count=0;
     SoundMeta* temp;
     SoundMeta* first_match;
 
-    playlists[0].size = 0;
+    // index 0 of playlist should be allocated in main
+    assert(playlists[0]!=NULL);
+    playlists[0]->size = 0;
     if (letter_count > 0) {
         for(i=0;i<songbook->size;++i){
             temp = songbook->songs[i];
             if (strcasestr(temp->file_name, input_buf) != NULL) {
-                strcpy(playlists[0].song_names[playlists[0].size], temp->file_name);
-                ++playlists[0].size;
+                strcpy(playlists[0]->song_names[playlists[0]->size], temp->file_name);
+                ++playlists[0]->size;
                 if(++match_count == 1) first_match = temp;
             }
         }
         // maximum of 5 results at a time
         // Songbook is added because it carries the "current song" that might be changed
-        playlists[0].every_song = playlists[0].size == songbook->size;
+        playlists[0]->every_song = playlists[0]->size == songbook->size;
 
         temp_ind = songbook->playlist;
         songbook->playlist = 0;
@@ -391,11 +485,11 @@ void draw_home(Font* font, AllSongs* songbook, AllSongs* queue, Playlist* playli
     }
 
     // DRAW QUEUE
-    playlists[0].size = 0;
-    playlists[0].every_song = 0;
+    playlists[0]->size = 0;
+    playlists[0]->every_song = 0;
     for(i=0;i<queue->size;++i){
-        strcpy(playlists[0].song_names[playlists[0].size], queue->songs[i]->file_name);
-        ++playlists[0].size;
+        strcpy(playlists[0]->song_names[playlists[0]->size], queue->songs[i]->file_name);
+        ++playlists[0]->size;
     }
     temp_ind = songbook->playlist;
     songbook->playlist = 0;

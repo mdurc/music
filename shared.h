@@ -5,7 +5,8 @@
 #include "libs/miniaudio.h"
 
 
-#define MAX_PLAYLISTS 10
+#define MAX_PLAYLISTS 5 // Will only actually allow MAX_PLAYLISTS-1 playlists bc index 0 is a placeholder
+#define MAX_PLAYNAME 9
 #define MAX_SONGS 1000
 #define MAX_FNAME_LEN 16
 
@@ -43,6 +44,7 @@ int find(AllSongs* songbook, char* file_name);
 void parse_sound(const char* filepath, const char* filename, SoundMeta* sound, ma_engine* engine);
 
 void remove_from_queue(AllSongs* queue, int i);
+void remove_from_playlist(Playlist* playlist[MAX_PLAYLISTS], int i);
 
 void reload_music_dir(AllSongs* songbook);
 

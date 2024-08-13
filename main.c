@@ -32,6 +32,15 @@ void remove_from_queue(AllSongs* queue, int i){
 }
 
 
+void remove_from_playlist(Playlist* playlist[MAX_PLAYLISTS], int i){
+    free(playlist[i]);
+    for(;i<MAX_PLAYLISTS-1;++i){
+        playlist[i] = playlist[i+1];
+    }
+    playlist[MAX_PLAYLISTS-1] = NULL;
+}
+
+
 void format_file_size(off_t size, char* buffer) {
     if (size >= 1024 * 1024) {
         snprintf(buffer, 20, "%.2f MB", (double)size / (1024 * 1024));
@@ -174,14 +183,13 @@ void handle_arrows(Vector2 mouse_pos, Vector2 text_size, Vector2 left_arrow_pos,
 }
 
 int main(){
-
     srand(time(NULL));
 
     int i;
-    // potentially put songbook and queue on heap, leave playlists on stack
+    // potentially put songbook and queue on heap
     AllSongs songbook;
     AllSongs queue;
-    Playlist playlists[MAX_PLAYLISTS];
+    Playlist* playlists[MAX_PLAYLISTS];
 
 
     const int WIDTH = 800;
@@ -227,6 +235,7 @@ int main(){
     for(i=0; i<MAX_SONGS; ++i){
         songbook.songs[i] = NULL;
         if(i<MAX_SONGS) queue.songs[i] = NULL;
+        if(i<MAX_PLAYLISTS) playlists[i] = NULL; // start them all un-initialized. Only malloc once a new playlist is required.
     }
     songbook.size = 0;
     songbook.playlist = 1;
@@ -238,15 +247,20 @@ int main(){
 
 
     // playlists[0] is reserved for queue and match_list
+    playlists[0] = malloc(sizeof(Playlist));
+    playlists[1] = malloc(sizeof(Playlist));
+    playlists[2] = malloc(sizeof(Playlist));
 
-    strcpy(playlists[1].name, "All Songs");
-    playlists[1].size = songbook.size;
-    playlists[1].every_song = 1;
+    // Add a playlist with all your songs cannot be removed
+    strcpy(playlists[1]->name, "All Songs");
+    playlists[1]->size = songbook.size;
+    playlists[1]->every_song = 1;
 
-    strcpy(playlists[2].name, "Lemeoneey");
-    strcpy(playlists[2].song_names[0], "Lemon.mp3");
-    playlists[2].size = 1;
-    playlists[2].every_song = 0;
+    // demo playlist
+    strcpy(playlists[2]->name, "Lemeoneey");
+    strcpy(playlists[2]->song_names[0], "Lemon.mp3");
+    playlists[2]->size = 1;
+    playlists[2]->every_song = 0;
 
 
 
