@@ -23,19 +23,23 @@ typedef struct{
 typedef struct {
     SoundMeta* songs[MAX_SONGS];
     SoundMeta* current_song; // points to a song inside of songs[MAX_SONGS]
-    int size;
+    int size, playlist; // both should start at 0
     bool playing;
 } AllSongs;
 
 typedef struct {
     char name[MAX_FNAME_LEN];
-    SoundMeta* songs[MAX_SONGS];
+    char song_names[MAX_SONGS][MAX_FNAME_LEN];
     int size;
+
+    // for if we want the playlist to be every single song downloaded,
+    // we wont have to add every song name into the song_names
+    bool every_song;
 } Playlist;
 
 
 
-SoundMeta* find(AllSongs* songbook, char* file_name);
+int find(AllSongs* songbook, char* file_name);
 void parse_sound(const char* filepath, const char* filename, SoundMeta* sound, ma_engine* engine);
 
 void remove_from_queue(AllSongs* queue, int i);

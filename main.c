@@ -10,16 +10,16 @@
 ma_engine engine;
 
 
-SoundMeta* find(AllSongs* songbook, char* file_name){
+// return index in songbook
+int find(AllSongs* songbook, char* file_name){
     int i;
-    SoundMeta* temp;
     for(i=0;i<songbook->size;++i){
         if(strcasecmp(songbook->songs[i]->file_name, file_name) == 0 &&
     strlen(songbook->songs[i]->file_name) == strlen(file_name)){
-            return songbook->songs[i];
+            return i;
         }
     }
-    return NULL;
+    return -1;
 }
 
 
@@ -113,7 +113,7 @@ void load_songs_from_directory( const char* dir_path, AllSongs* songbook,
                 strncpy(filename + MAX_FNAME_LEN - 3, "...", 4);
             }
 
-            if(find(songbook, filename) == NULL){
+            if(find(songbook, filename) == -1){
                 printf("Adding new song #%d: %s\n",i, filename);
                 SoundMeta* new_song = malloc(sizeof(SoundMeta));
                 if (new_song == NULL) { perror("malloc"); continue; }
@@ -178,9 +178,10 @@ int main(){
     srand(time(NULL));
 
     int i;
+    // potentially put songbook and queue on heap, leave playlists on stack
     AllSongs songbook;
     AllSongs queue;
-    Playlist* playlists[MAX_PLAYLISTS];
+    Playlist playlists[MAX_PLAYLISTS];
 
 
     const int WIDTH = 800;
@@ -210,7 +211,7 @@ int main(){
     // Opengl Context
     SetTraceLogLevel(LOG_ERROR); // Hide logs in raylib init to console
     InitWindow(WIDTH, HEIGHT, "Rythme");
-    SetWindowState(FLAG_WINDOW_UNDECORATED);
+    SetWindowState(FLAG_WINDOW_RESIZABLE);
     SetTargetFPS(60);
     Font font = LoadFont("/Users/mdurcan/Library/Fonts/UbuntuMono-B.ttf");
 
@@ -226,19 +227,34 @@ int main(){
     for(i=0; i<MAX_SONGS; ++i){
         songbook.songs[i] = NULL;
         if(i<MAX_SONGS) queue.songs[i] = NULL;
-        if(i<MAX_PLAYLISTS) playlists[i] = NULL;
     }
     songbook.size = 0;
+    songbook.playlist = 1;
     songbook.current_song = NULL;
     songbook.playing = false;
     queue.size = 0;
+
     reload_music_dir(&songbook);
 
-    init_scrn_manager(WIDTH, HEIGHT);
+
+    // playlists[0] is reserved for queue and match_list
+
+    strcpy(playlists[1].name, "All Songs");
+    playlists[1].size = songbook.size;
+    playlists[1].every_song = 1;
+
+    strcpy(playlists[2].name, "Lemeoneey");
+    strcpy(playlists[2].song_names[0], "Lemon.mp3");
+    playlists[2].size = 1;
+    playlists[2].every_song = 0;
 
 
 
     while (!WindowShouldClose()) {
+
+        // TODO: SCALING EVERYTHING
+        init_scrn_manager(WIDTH, HEIGHT);
+
         mouse_pos = GetMousePosition();
 
         handle_audio(mouse_pos, play_btn_center, play_btn_radius, left_arrow_pos, right_arrow_pos, &playback_line,
@@ -252,7 +268,7 @@ int main(){
         BeginDrawing();
         ClearBackground((Color){20, 20, 20, 255});
 
-        draw_scene(&font, &songbook, &queue, mouse_pos);
+        draw_scene(&font, &songbook, &queue, playlists, mouse_pos);
         draw_scrub_player(&font, mouse_pos, play_btn_center, play_btn_radius, left_arrow_pos, right_arrow_pos, &playback_line, progress, songbook.playing, songbook.current_song);
 
         EndDrawing();
