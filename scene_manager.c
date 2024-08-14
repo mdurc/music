@@ -359,7 +359,12 @@ void draw_library(Font* font, AllSongs* songbook, Playlist* playlists[MAX_PLAYLI
                     printf("Cannot remove \"All Songs\" playlist\n");
                 }else{
                     remove_from_playlist(playlists, i);
-                    printf("Removing playlist\n");
+                    printf("Removing playlist #%d\n", i);
+
+                    // if we just deleted the playlist that we were on, just go back to All Songs.
+                    // All Songs should just be index 1 of playlists. And it cannot be removed
+                    if(songbook->playlist == i) songbook->playlist = 1;
+
                     // we just removed the current index, so do --i and for-loop will do ++i to stay at same index
                     --i;
                     removed_playlist_inframe = 1;
