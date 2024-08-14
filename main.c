@@ -305,8 +305,8 @@ int main(){
     load_data(playlists);
 
 
-    const int WIDTH = 800;
-    const int HEIGHT = 450;
+    int WIDTH = 800;
+    int HEIGHT = 450;
     float progress=0.0f;
     bool dragging_scrubber = 0;
     unsigned int sample_rate;
@@ -360,7 +360,8 @@ int main(){
 
     while (!WindowShouldClose()) {
 
-        // TODO: SCALING EVERYTHING
+        WIDTH = GetScreenWidth();
+        HEIGHT = GetScreenHeight();
         init_scrn_manager(WIDTH, HEIGHT);
 
         mouse_pos = GetMousePosition();

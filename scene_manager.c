@@ -403,7 +403,6 @@ void draw_search_bar(Font* font, Rectangle* search_bar){
 
 
 
-// TODO: download playlist and add to playlists
 void draw_download(Font* font, AllSongs* songbook, Playlist* playlist[MAX_PLAYLISTS], Vector2 mouse_pos) {
     int i, y_offset;
     char cmd[150 + MAX_INPUT_CHARS];
@@ -565,7 +564,6 @@ void draw_library(Font* font, AllSongs* songbook, Playlist* playlists[MAX_PLAYLI
         DrawTextEx(*font, "Enter playlist name:", (Vector2){square.x + 10, square.y + 10}, 20, 1, RAYWHITE);
         DrawTextEx(*font, input_buf, (Vector2){square.x + 10, square.y + 40}, 20, 1, RAYWHITE);
 
-        // TODO: diasable raylib exit application on ESC
         if(IsKeyPressed(KEY_ESCAPE)) is_popup_open = false;
     }
 }
