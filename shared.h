@@ -12,7 +12,7 @@
 
 typedef struct{
     // Meta data
-    char file_name[256];
+    char file_name[MAX_FNAME_LEN+1]; // for null term
     char file_size[64];
     float duration;
     bool favorite;
@@ -30,7 +30,7 @@ typedef struct {
 
 typedef struct {
     char name[MAX_PLAYNAME + 1]; // for null term
-    char song_names[MAX_SONGS][256];
+    char song_names[MAX_SONGS][MAX_FNAME_LEN+1];
     int size;
 
     // for if we want the playlist to be every single song downloaded,

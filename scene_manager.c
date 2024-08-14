@@ -448,7 +448,8 @@ void draw_library(Font* font, AllSongs* songbook, Playlist* playlists[MAX_PLAYLI
             playlists[i] = malloc(sizeof(Playlist));
 
             // init new playlist at index i
-            strcpy(playlists[i]->name, input_buf);
+            strncpy(playlists[i]->name, input_buf, sizeof(playlists[i]->name) - 1);
+            playlists[i]->name[sizeof(playlists[i]->name)-1] = '\0';
             playlists[i]->size = 0;
             playlists[i]->every_song = 0;
 
@@ -477,6 +478,8 @@ void draw_home(Font* font, AllSongs* songbook, AllSongs* queue, Playlist* playli
         for(i=0;i<songbook->size;++i){
             temp = songbook->songs[i];
             if (strcasestr(temp->file_name, input_buf) != NULL) {
+                // i do not want memory overflow ever again
+                assert(sizeof(playlists[0]->song_names[playlists[0]->size]) >= sizeof(temp->file_name));
                 strcpy(playlists[0]->song_names[playlists[0]->size], temp->file_name);
                 ++playlists[0]->size;
                 if(++match_count == 1) first_match = temp;
@@ -505,6 +508,10 @@ void draw_home(Font* font, AllSongs* songbook, AllSongs* queue, Playlist* playli
         song_name_size = sizeof(playlists[0]->song_names[playlists[0]->size]);
 
         // populate and ensure memory safety
+
+        assert(song_name_size >= sizeof(queue->songs[i]->file_name));
+
+        // strncpy anyways, even after doing the assert
         strncpy(current_song_name, queue->songs[i]->file_name, song_name_size - 1);
         current_song_name[song_name_size - 1] = '\0';
 

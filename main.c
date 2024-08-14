@@ -68,7 +68,8 @@ void parse_sound(const char* filepath, const char* filename, SoundMeta* sound, m
 
     format_file_size(file_stat.st_size, sound->file_size);
 
-    strncpy(sound->file_name, filename, sizeof(sound->file_name) - 1);
+    assert(sizeof(sound->file_name) >= sizeof(filename));
+    strcpy(sound->file_name, filename);
     sound->file_name[sizeof(sound->file_name) - 1] = '\0';
 
     sound->favorite = 0;
@@ -96,7 +97,7 @@ void load_songs_from_directory( const char* dir_path, AllSongs* songbook,
     DIR *dir;
     struct dirent *entry;
     char file_path[1035];
-    char filename[256];
+    char filename[MAX_FNAME_LEN+1];
     char* file_name_start;
     
     if ((dir = opendir(dir_path)) == NULL) {
@@ -116,12 +117,8 @@ void load_songs_from_directory( const char* dir_path, AllSongs* songbook,
             if (file_name_start) file_name_start++;
             else file_name_start = file_path;
 
-            strncpy(filename, file_name_start, sizeof(filename) - 1);
-            filename[sizeof(filename) - 1] = '\0';
-
-            if (strlen(filename) > MAX_FNAME_LEN) {
-                strncpy(filename + MAX_FNAME_LEN - 3, "...", 4);
-            }
+            strncpy(filename, file_name_start, MAX_FNAME_LEN);
+            filename[sizeof(filename) - 1] = '\0'; // should be room: MAX_FNAME_LEN + 1 is the size
 
             if(find(songbook, filename) == -1){
                 printf("Adding new song #%d: %s\n",i, filename);
