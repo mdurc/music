@@ -5,10 +5,12 @@
 #include "libs/miniaudio.h"
 
 
-#define MAX_PLAYLISTS 5 // Will only actually allow MAX_PLAYLISTS-1 playlists bc index 0 is a placeholder
+#define MAX_PLAYLISTS 6 // Will only actually allow MAX_PLAYLISTS-1 playlists bc index 0 is a placeholder
 #define MAX_PLAYNAME 9
 #define MAX_SONGS 1000
 #define MAX_FNAME_LEN 16
+#define ORIG_WIDTH 950
+#define ORIG_HEIGHT 550
 
 typedef struct{
     // Meta data

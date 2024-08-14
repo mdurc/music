@@ -305,15 +305,15 @@ int main(){
     load_data(playlists);
 
 
-    int WIDTH = 800;
-    int HEIGHT = 450;
+    int WIDTH = ORIG_WIDTH;
+    int HEIGHT = ORIG_HEIGHT;
     float progress=0.0f;
     bool dragging_scrubber = 0;
     unsigned int sample_rate;
 
 
-    Rectangle playback_line = { 100, HEIGHT - 50, WIDTH - 200, 10 };
-    Vector2 play_btn_center = {WIDTH/2.0f, HEIGHT-80};
+    Rectangle playback_line = {.height = 10, .x = 100};
+    Vector2 play_btn_center;
     float play_btn_radius = 15.0f;
 
     Vector2 mouse_pos;
@@ -339,8 +339,8 @@ int main(){
 
 
     Vector2 text_size = MeasureTextEx(font, "->", 20, 1);
-    Vector2 left_arrow_pos = (Vector2){play_btn_center.x - play_btn_radius*2 - text_size.x, play_btn_center.y - text_size.y/2.0f};
-    Vector2 right_arrow_pos = (Vector2){play_btn_center.x + play_btn_radius*2, play_btn_center.y - text_size.y/2.0f};
+    Vector2 left_arrow_pos;
+    Vector2 right_arrow_pos;
 
 
     sample_rate = engine.sampleRate;
@@ -362,6 +362,27 @@ int main(){
 
         WIDTH = GetScreenWidth();
         HEIGHT = GetScreenHeight();
+        if(HEIGHT > 800){
+            HEIGHT = 800;
+            SetWindowSize(WIDTH, HEIGHT);
+        }else if(HEIGHT < 500){
+            HEIGHT = 500;
+            SetWindowSize(WIDTH, HEIGHT);
+        }else if(WIDTH < ORIG_WIDTH){
+            WIDTH = ORIG_WIDTH;
+            SetWindowSize(WIDTH, HEIGHT);
+        }
+
+        playback_line.y = (HEIGHT - 50);
+        playback_line.width = (WIDTH - 200);
+
+        play_btn_center.x=WIDTH/2.0f;
+        play_btn_center.y=HEIGHT-80;
+        left_arrow_pos.x = (play_btn_center.x - play_btn_radius * 2 - text_size.x);
+        left_arrow_pos.y = (play_btn_center.y - text_size.y / 2.0f);
+        right_arrow_pos.x = (play_btn_center.x + play_btn_radius * 2);
+        right_arrow_pos.y = (play_btn_center.y - text_size.y / 2.0f);
+
         init_scrn_manager(WIDTH, HEIGHT);
 
         mouse_pos = GetMousePosition();

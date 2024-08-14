@@ -198,7 +198,7 @@ void song_scroll(Font* font, SoundMeta** current_song, AllSongs* song_list, AllS
             continue;
         }
 
-        Rectangle rect = { g_width / 4.0f + x, startY + 10 + y, no_scroll_for_queue?130:400, ITEM_HEIGHT };
+        Rectangle rect = { g_width/2.0 + x, startY + 10 + y, no_scroll_for_queue?130:400, ITEM_HEIGHT };
 
         collision = CheckCollisionPointRec(mouse_pos, rect);
         DrawRectangleRec(rect, !is_popup_open && collision?GRAY:DARKGRAY);
@@ -238,15 +238,15 @@ void song_scroll(Font* font, SoundMeta** current_song, AllSongs* song_list, AllS
                 }
             }else if(!no_scroll_for_queue && IsKeyPressed(KEY_RIGHT)){
                 is_popup_open = true;
-                save_vect.x = g_width/4.0f + x;
-                save_vect.y = startY+10+y;
+                save_vect.x = rect.x;
+                save_vect.y = rect.y;
 
                 assert(sizeof(save_fname) <= sizeof(temp->file_name));
                 strcpy(save_fname, temp->file_name);
             }
         }
         DrawTextEx(*font, temp->file_name, 
-                (Vector2){g_width / 4.0f + 10 + x, startY + ITEM_HEIGHT/2.0 + y + (no_scroll_for_queue?5:0)}, 
+                (Vector2){g_width / 2.0 + x + 10, startY + ITEM_HEIGHT/2.0 + y + (no_scroll_for_queue?5:0)}, 
                 ITEM_HEIGHT/2.0, 1, WHITE);
 
         startY += ITEM_HEIGHT+gap;
@@ -255,9 +255,9 @@ void song_scroll(Font* font, SoundMeta** current_song, AllSongs* song_list, AllS
     }
 
     Rectangle perimeter = {
-        g_width / 4.0f - 13-ITEM_HEIGHT + x,     // x coord
+        g_width / 2.0f - 13-ITEM_HEIGHT + x,     // x coord
         y-ITEM_HEIGHT,                        // y coord
-        g_width / 2.0f + 24 + ITEM_HEIGHT*2, // width
+        !no_scroll_for_queue ? 505: 195, // width
         visible_item_len+19+ITEM_HEIGHT      // height
     };
     DrawRectangleLinesEx(perimeter, ITEM_HEIGHT+8 /* thickness */, (Color){20, 20, 20, 255});
@@ -450,7 +450,7 @@ void draw_library(Font* font, AllSongs* songbook, Playlist* playlists[MAX_PLAYLI
     int i, key;
     int square_size = 80;
     int padding = 20;
-    int x = 200;
+    int x = g_width/5 + 50;
     int y = 100;
     int font_size = 15;
     bool removed_playlist_inframe = 0;
@@ -615,10 +615,12 @@ void draw_home(Font* font, AllSongs* songbook, AllSongs* queue, Playlist* playli
 
         temp_ind = songbook->playlist;
         songbook->playlist = 0;
-        song_scroll(font, &songbook->current_song, songbook, queue, playlists, mouse_pos, -70, 100, 40, 5, false);
+        i= 7+(g_height-ORIG_HEIGHT)/40;
+        song_scroll(font, &songbook->current_song, songbook, queue, playlists, mouse_pos, -200, 100, 40, 7>i?7:i, false);
         songbook->playlist = temp_ind;
     }else{
-        song_scroll(font, &songbook->current_song, songbook, queue, playlists , mouse_pos, -70, 100, 40, 5, false);
+        i= 7+(g_height-ORIG_HEIGHT)/40;
+        song_scroll(font, &songbook->current_song, songbook, queue, playlists , mouse_pos, -200, 100, 40, 7>i?7:i, false);
     }
 
     // DRAW QUEUE
@@ -643,10 +645,11 @@ void draw_home(Font* font, AllSongs* songbook, AllSongs* queue, Playlist* playli
 
     // plug queue in, instead of songbooks, so that we only look for queue songs:
     queue->playlist = 0;
-    song_scroll(font, &songbook->current_song, queue, queue, playlists, mouse_pos, 400, 100, 20, 5, true);
+    i= 7+(g_height-ORIG_HEIGHT)/40;
+    song_scroll(font, &songbook->current_song, queue, queue, playlists, mouse_pos, 270, 100, 20, 7>i?7:i, true);
 
 
-    Rectangle search_bar = {(g_width-400)/2.0f, 20, 400, 40};
+    Rectangle search_bar = {g_width/2.0-200, 20, 400, 40};
     // check if KEY_ENTER was pressed
     if(create_typing_popup(&search_bar, mouse_pos, MAX_INPUT_CHARS, true)){
         printf("Searching for: %s\n", input_buf);
@@ -654,7 +657,7 @@ void draw_home(Font* font, AllSongs* songbook, AllSongs* queue, Playlist* playli
             search_song = NULL;
         }else{
             temp_ind = find(songbook, input_buf);
-            if(temp_ind == -1){
+            if(temp_ind == -1 && !found_in_playlist(playlists[1], input_buf)){
                 printf("Song is no longer downloaded. Removing: %s\n", input_buf);
                 remove_song_from_playlist(playlists[songbook->playlist], input_buf);
                 printf("Not found\n");
