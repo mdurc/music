@@ -152,7 +152,7 @@ int create_option_popup(Font* font, Rectangle* options_box, char options[MAX_PLA
             break;
         }
     }
-    if(IsKeyPressed(KEY_LEFT)) return -2;
+    if(IsKeyPressed(KEY_ESCAPE) || IsKeyPressed(KEY_LEFT)) return -2;
 
     return selected_option;
 }
@@ -479,7 +479,6 @@ void draw_library(Font* font, AllSongs* songbook, Playlist* playlists[MAX_PLAYLI
                 songbook->playlist = i;
                 printf("Moving to playlist #%d\n", i);
             }else if(IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)){
-                //TODO: instead of right clicking everywhere, just add an elipses that opens an options popup to take different actions
                 if(strMatch(playlists[i]->name, "All Songs")){
                     printf("Cannot remove \"All Songs\" playlist\n");
                 }else{
@@ -589,16 +588,25 @@ void draw_home(Font* font, AllSongs* songbook, AllSongs* queue, Playlist* playli
     playlists[0]->size = 0;
     if (letter_count > 0) {
         for(i=0;i<playlists[songbook->playlist]->size;++i){
+
+            // using temp as a pseudo alias
             assert(sizeof(temp) >= sizeof(playlists[songbook->playlist]->song_names[i]));
             strcpy(temp, playlists[songbook->playlist]->song_names[i]);
             if (strcasestr(temp, input_buf) != NULL) {
+                // make sure the song still exists
+                temp_ind = find(songbook,temp);
+                if(temp_ind == -1){
+                    printf("Song is no longer downloaded. Removing: %s\n", temp);
+                    remove_song_from_playlist(playlists[songbook->playlist], temp);
+                    continue;
+                }
+
                 // i do not want memory overflow ever again
                 assert(sizeof(playlists[0]->song_names[playlists[0]->size]) >= sizeof(temp));
                 strcpy(playlists[0]->song_names[playlists[0]->size], temp);
                 ++playlists[0]->size;
                 if(++match_count == 1){
-                    temp_ind = find(songbook,temp);
-                    assert(temp_ind != -1); // it should always be found
+                    assert(temp_ind != -1); // it should always be found or the song has been removed
                     first_match = songbook->songs[temp_ind];
                 }
             }
@@ -648,6 +656,13 @@ void draw_home(Font* font, AllSongs* songbook, AllSongs* queue, Playlist* playli
             search_song = NULL;
         }else{
             temp_ind = find(songbook, input_buf);
+            if(temp_ind == -1){
+                printf("Song is no longer downloaded. Removing: %s\n", input_buf);
+                remove_song_from_playlist(playlists[songbook->playlist], input_buf);
+                printf("Not found\n");
+                draw_search_bar(font, &search_bar);
+                return;
+            }
             search_song = temp_ind!=-1 ? songbook->songs[temp_ind] : NULL;
         }
 

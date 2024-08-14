@@ -7,9 +7,6 @@
 #define MINIAUDIO_IMPLEMENTATION
 #include "scene_manager.h"
 
-// TODO: add songs to playlist
-// TODO: playlist persistance
-
 ma_engine engine;
 
 bool strMatch(char* a, char* b){ return strcmp(a,b)==0 && strlen(a)==strlen(b); }
@@ -47,13 +44,13 @@ void remove_playlist(Playlist* playlist[MAX_PLAYLISTS], int i){
 }
 
 
-void format_file_size(off_t size, char* buffer) {
+void format_file_size(off_t size, char* buf) {
     if (size >= 1024 * 1024) {
-        snprintf(buffer, 20, "%.2f MB", (double)size / (1024 * 1024));
+        snprintf(buf, 20, "%.2f MB", (double)size / (1024 * 1024));
     } else if (size >= 1024) {
-        snprintf(buffer, 20, "%.2f KB", (double)size / 1024);
+        snprintf(buf, 20, "%.2f KB", (double)size / 1024);
     } else {
-        snprintf(buffer, 20, "%lld B", (long long)size);
+        snprintf(buf, 20, "%lld B", (long long)size);
     }
 }
 
@@ -171,7 +168,13 @@ void next_in_queue(AllSongs* songbook, AllSongs* queue, Playlist* playlists[MAX_
 
         // find random song in current playlist
         char* temp = playlists[songbook->playlist]->song_names[rand()%playlists[songbook->playlist]->size];
-        songbook->current_song = songbook->songs[find(songbook, temp)];
+        int index = find(songbook, temp);
+        if(index == -1){
+            printf("Song is no longer downloaded. Removing: %s\n", temp);
+            remove_song_from_playlist(playlists[songbook->playlist], temp);
+            return;
+        }
+        songbook->current_song = songbook->songs[index];
 
         // restart song before playing
         ma_sound_seek_to_pcm_frame(&songbook->current_song->audio, 0);
@@ -201,6 +204,94 @@ void handle_arrows(Vector2 mouse_pos, Vector2 text_size, Vector2 left_arrow_pos,
     }
 }
 
+void save_data(Playlist* playlists[MAX_PLAYLISTS]) {
+    int i, j;
+    FILE *file = fopen("playlists.txt", "w");
+    if (file == NULL) {
+        perror("Failed to open file for writing");
+        return;
+    }
+
+    // only save from index 2 on
+    for(i=2; i<MAX_PLAYLISTS; i++){
+        if (playlists[i] != NULL) {
+            printf("Saving data of playlist: %s\n", playlists[i]->name);
+            fprintf(file, "%s\n", playlists[i]->name);
+            fprintf(file, "%d\n", playlists[i]->size);
+            fprintf(file, "%d\n", playlists[i]->every_song);
+
+            for(j=0; j<playlists[i]->size; ++j) {
+                fprintf(file, "%s\n", playlists[i]->song_names[j]);
+            }
+            fprintf(file, "--\n");
+        }
+    }
+    fclose(file);
+}
+
+void clean_playlists(Playlist* playlists[MAX_PLAYLISTS], AllSongs* songbook){
+    int i, j;
+
+    // start at the saved custom playlists, index 2
+    for(i=2;i<MAX_PLAYLISTS && playlists[i]!=NULL; ++i){
+        printf("Cleaning playlist: %s\n", playlists[i]->name);
+        for(j=0;j<playlists[i]->size;){
+            if(find(songbook, playlists[i]->song_names[j]) == -1){
+                printf("Song is no longer downloaded. Removing: %s\n", playlists[i]->song_names[j]);
+                remove_song_from_playlist(playlists[i], playlists[i]->song_names[j]);
+            }else{
+                ++j;
+            }
+        }
+    }
+}
+
+void load_data(Playlist* playlists[MAX_PLAYLISTS]) {
+    FILE *file = fopen("playlists.txt", "r");
+    if (file == NULL) {
+        perror("Failed to open file for reading");
+        return;
+    }
+
+    // buf will be used for both sizes
+    assert(MAX_FNAME_LEN >= MAX_PLAYNAME);
+    char buf[MAX_FNAME_LEN+2]; // one for newline and another for null
+
+
+    // Note: start allocating for playlists at index 2.
+    // Index 0 and 1 are saved for placeholder and All Songs.
+    int i, playlist_ind = 2;
+    size_t str_sz;
+
+    while (fgets(buf, sizeof(buf), file) != NULL && playlist_ind < MAX_PLAYLISTS) {
+        playlists[playlist_ind] = malloc(sizeof(Playlist));
+
+        buf[strlen(buf)-1] = '\0'; // remove \n bc it counts as a part of strln
+        str_sz = sizeof(playlists[playlist_ind]->name);
+        strncpy(playlists[playlist_ind]->name, buf, str_sz-1);
+        playlists[playlist_ind]->name[str_sz-1] = '\0';
+
+        fgets(buf, sizeof(buf), file);
+        playlists[playlist_ind]->size = atoi(buf);
+
+        fgets(buf, sizeof(buf), file);
+        playlists[playlist_ind]->every_song = atoi(buf);
+
+        for(i=0; i<playlists[playlist_ind]->size; ++i) {
+            fgets(buf, sizeof(buf), file);
+            buf[strlen(buf)-1] = '\0'; // remove \n bc it counts as a part of strln
+            str_sz = sizeof(playlists[playlist_ind]->song_names[i]);
+            strncpy(playlists[playlist_ind]->song_names[i], buf, str_sz-1);
+            playlists[playlist_ind]->song_names[i][str_sz-1] = '\0';
+        }
+
+        // read the separator : "--\n"
+        fgets(buf, sizeof(buf), file);
+        ++playlist_ind;
+    }
+    fclose(file);
+}
+
 int main(){
     srand(time(NULL));
 
@@ -211,6 +302,7 @@ int main(){
 
     // start them all un-initialized. Only malloc once a new playlist is required.
     Playlist* playlists[MAX_PLAYLISTS] = {NULL};
+    load_data(playlists);
 
 
     const int WIDTH = 800;
@@ -242,6 +334,7 @@ int main(){
     InitWindow(WIDTH, HEIGHT, "Rythme");
     SetWindowState(FLAG_WINDOW_RESIZABLE);
     SetTargetFPS(60);
+    SetExitKey(0);
     Font font = LoadFont("/Users/mdurcan/Library/Fonts/UbuntuMono-B.ttf");
 
 
@@ -256,7 +349,6 @@ int main(){
     // playlists[0] is reserved for queue and match_list
     playlists[0] = malloc(sizeof(Playlist));
     playlists[1] = malloc(sizeof(Playlist));
-    playlists[2] = malloc(sizeof(Playlist));
     reload_music_dir(&songbook, playlists[1]);
 
 
@@ -264,14 +356,6 @@ int main(){
     // Add a playlist with all your songs cannot be removed
     strcpy(playlists[1]->name, "All Songs");
     playlists[1]->every_song = 1;
-
-    // demo playlist
-    strcpy(playlists[2]->name, "Lemeoneey");
-    strcpy(playlists[2]->song_names[0], "Lemon.mp3");
-    playlists[2]->size = 1;
-    playlists[2]->every_song = 0;
-
-
 
 
     while (!WindowShouldClose()) {
@@ -298,6 +382,8 @@ int main(){
         EndDrawing();
     }
 
+    clean_playlists(playlists, &songbook);
+    save_data(playlists);
     clear_mem(&songbook, playlists);
     UnloadFont(font);
     ma_engine_uninit(&engine);
