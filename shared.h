@@ -47,7 +47,7 @@ void parse_sound(const char* filepath, const char* filename, SoundMeta* sound, m
 void remove_from_queue(AllSongs* queue, int i);
 void remove_from_playlist(Playlist* playlist[MAX_PLAYLISTS], int i);
 
-void reload_music_dir(AllSongs* songbook);
+void reload_music_dir(AllSongs* songbook, Playlist* all_songs);
 
 
 bool btn_pressed(Vector2 mouse_pos, Rectangle* btn);

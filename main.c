@@ -93,7 +93,7 @@ void clear_mem(AllSongs* songbook){
 
 
 void load_songs_from_directory( const char* dir_path, AllSongs* songbook,
-                                ma_engine* engine) {
+                                ma_engine* engine, Playlist* all_songs) {
     DIR *dir;
     struct dirent *entry;
     char file_path[1035];
@@ -128,6 +128,9 @@ void load_songs_from_directory( const char* dir_path, AllSongs* songbook,
                 parse_sound(file_path, filename, new_song, engine);
                 songbook->songs[songbook->size] = new_song;
                 ++songbook->size;
+
+                strcpy(all_songs->song_names[all_songs->size], filename);
+                ++all_songs->size;
             }
         }
     }
@@ -136,11 +139,12 @@ void load_songs_from_directory( const char* dir_path, AllSongs* songbook,
 }
 
 
-void reload_music_dir(AllSongs* songbook){
+void reload_music_dir(AllSongs* songbook, Playlist* all_songs){
     printf("SONG COUNT: %d\n", songbook->size);
-    load_songs_from_directory("music/", songbook, &engine);
+    load_songs_from_directory("music/", songbook, &engine, all_songs);
     printf("NEW SONG COUNT: %d\n", songbook->size);
 }
+
 
 void next_in_queue(AllSongs* songbook, AllSongs* queue){
     if(queue->size > 0){
@@ -241,17 +245,16 @@ int main(){
     songbook.playing = false;
     queue.size = 0;
 
-    reload_music_dir(&songbook);
-
-
     // playlists[0] is reserved for queue and match_list
     playlists[0] = malloc(sizeof(Playlist));
     playlists[1] = malloc(sizeof(Playlist));
     playlists[2] = malloc(sizeof(Playlist));
+    reload_music_dir(&songbook, playlists[1]);
+
+
 
     // Add a playlist with all your songs cannot be removed
     strcpy(playlists[1]->name, "All Songs");
-    playlists[1]->size = songbook.size;
     playlists[1]->every_song = 1;
 
     // demo playlist

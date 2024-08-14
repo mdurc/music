@@ -37,7 +37,7 @@ bool is_popup_open = false;
 void draw_sidebar();
 void draw_home(Font* font, AllSongs* songbook, AllSongs* queue, Playlist* playlists[MAX_PLAYLISTS], Vector2 mouse_pos);
 void draw_library(Font* font, AllSongs* songbook, Playlist* playlists[MAX_PLAYLISTS], Vector2 mouse_pos);
-void draw_download(Font* font, AllSongs* songbook, Vector2 mouse_pos);
+void draw_download(Font* font, AllSongs* songbook, Playlist* playlist[MAX_PLAYLISTS], Vector2 mouse_pos);
 
 
 
@@ -72,7 +72,7 @@ void draw_scene(Font* font, AllSongs* songbook, AllSongs* queue, Playlist* playl
             draw_library(font, songbook, playlists, mouse_pos);
             break;
         case SCENE_DOWNLOAD:
-            draw_download(font, songbook, mouse_pos);
+            draw_download(font, songbook, playlists, mouse_pos);
             break;
         default:
             break;
@@ -281,7 +281,7 @@ void draw_search_bar(Font* font, Rectangle* search_bar){
 
 
 // TODO: download playlist and add to playlists
-void draw_download(Font* font, AllSongs* songbook, Vector2 mouse_pos) {
+void draw_download(Font* font, AllSongs* songbook, Playlist* playlist[MAX_PLAYLISTS], Vector2 mouse_pos) {
     int i, y_offset;
     char cmd[150 + MAX_INPUT_CHARS];
     Rectangle search_bar = {(g_width-400)/2.0f, 60, 400, 40};
@@ -300,7 +300,7 @@ void draw_download(Font* font, AllSongs* songbook, Vector2 mouse_pos) {
             flag_download_complete = 1;
             flag_download_failed = 0;
 
-            reload_music_dir(songbook);
+            reload_music_dir(songbook, playlist[1]);
         }else{
             flag_download_complete = 0;
             flag_download_failed = 1;
@@ -471,23 +471,31 @@ void draw_library(Font* font, AllSongs* songbook, Playlist* playlists[MAX_PLAYLI
 void draw_home(Font* font, AllSongs* songbook, AllSongs* queue, Playlist* playlists[MAX_PLAYLISTS], Vector2 mouse_pos) {
 
     int i, temp_ind, match_count=0;
-    SoundMeta* temp;
+    char temp[MAX_FNAME_LEN+1];
     SoundMeta* first_match;
+    SoundMeta* search_song;
     char* current_song_name;
     size_t song_name_size;
 
     // index 0 of playlist should be allocated in main
+    // put the matches of the search into the playlist index 0
+    // pull from whatever the current playlist is
     assert(playlists[0]!=NULL);
     playlists[0]->size = 0;
     if (letter_count > 0) {
-        for(i=0;i<songbook->size;++i){
-            temp = songbook->songs[i];
-            if (strcasestr(temp->file_name, input_buf) != NULL) {
+        for(i=0;i<playlists[songbook->playlist]->size;++i){
+            assert(sizeof(temp) >= sizeof(playlists[songbook->playlist]->song_names[i]));
+            strcpy(temp, playlists[songbook->playlist]->song_names[i]);
+            if (strcasestr(temp, input_buf) != NULL) {
                 // i do not want memory overflow ever again
-                assert(sizeof(playlists[0]->song_names[playlists[0]->size]) >= sizeof(temp->file_name));
-                strcpy(playlists[0]->song_names[playlists[0]->size], temp->file_name);
+                assert(sizeof(playlists[0]->song_names[playlists[0]->size]) >= sizeof(temp));
+                strcpy(playlists[0]->song_names[playlists[0]->size], temp);
                 ++playlists[0]->size;
-                if(++match_count == 1) first_match = temp;
+                if(++match_count == 1){
+                    temp_ind = find(songbook,temp);
+                    assert(temp_ind != -1); // it should always be found
+                    first_match = songbook->songs[temp_ind];
+                }
             }
         }
         // maximum of 5 results at a time
@@ -513,7 +521,6 @@ void draw_home(Font* font, AllSongs* songbook, AllSongs* queue, Playlist* playli
         song_name_size = sizeof(playlists[0]->song_names[playlists[0]->size]);
 
         // populate and ensure memory safety
-
         assert(song_name_size >= sizeof(queue->songs[i]->file_name));
 
         // strncpy anyways, even after doing the assert
@@ -530,18 +537,25 @@ void draw_home(Font* font, AllSongs* songbook, AllSongs* queue, Playlist* playli
 
     Rectangle search_bar = {(g_width-400)/2.0f, 20, 400, 40};
     // check if KEY_ENTER was pressed
+    // TODO: ONLY SEARCH WITHIN THE CURRENT PLAYLIST
     if(create_search_bar(&search_bar, mouse_pos)){
         printf("Searching for: %s\n", input_buf);
-        temp_ind = find(songbook, input_buf);
-        temp = temp_ind!=-1 ? songbook->songs[temp_ind] : NULL;
+        if(!found_in_playlist(playlists[songbook->playlist], input_buf)){
+            printf("Not found\n");
+            search_song = NULL;
+        }else{
+            temp_ind = find(songbook, input_buf);
+            search_song = temp_ind!=-1 ? songbook->songs[temp_ind] : NULL;
+        }
 
-        if((temp || match_count==1) && songbook->current_song && ma_sound_is_playing(&songbook->current_song->audio)){
+
+        if((search_song || match_count==1) && songbook->current_song && ma_sound_is_playing(&songbook->current_song->audio)){
             ma_sound_stop(&songbook->current_song->audio);
         }
 
-        if(temp){
+        if(search_song){
             printf("Found\n");
-            songbook->current_song = temp;
+            songbook->current_song = search_song;
         }else if(match_count==1){
             printf("Playing top pick\n");
             songbook->current_song = first_match;
@@ -549,7 +563,7 @@ void draw_home(Font* font, AllSongs* songbook, AllSongs* queue, Playlist* playli
             printf("Not found\n");
         }
 
-        if(temp || match_count==1){
+        if(search_song || match_count==1){
             // restart the song and then play it
             ma_sound_seek_to_pcm_frame(&songbook->current_song->audio, 0);
             ma_sound_start(&songbook->current_song->audio);
