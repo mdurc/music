@@ -45,7 +45,7 @@ int find(AllSongs* songbook, char* file_name);
 void parse_sound(const char* filepath, const char* filename, SoundMeta* sound, ma_engine* engine);
 
 void remove_from_queue(AllSongs* queue, int i);
-void remove_from_playlist(Playlist* playlist[MAX_PLAYLISTS], int i);
+void remove_playlist(Playlist* playlist[MAX_PLAYLISTS], int i);
 
 void reload_music_dir(AllSongs* songbook, Playlist* all_songs);
 

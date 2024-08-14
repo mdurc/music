@@ -9,7 +9,7 @@
 
 #define SIDEBAR_WIDTH 60
 #define ICON_SIZE 40
-#define MAX_INPUT_CHARS 43 // size of youtube url
+#define MAX_INPUT_CHARS 30 // size of youtube url
 
 Rectangle home = {10, 10, ICON_SIZE, ICON_SIZE};
 Rectangle lib = {10, 60, ICON_SIZE, ICON_SIZE};
@@ -19,6 +19,11 @@ SceneType current_scene = SCENE_HOME;
 int g_width, g_height;
 
 float g_scrollOffset = 0.0f;
+
+// for adding/removing songs to/from playlists
+char save_fname[MAX_FNAME_LEN+1];
+Vector2 save_vect;
+bool adding_song=0, removing_song=0;
 
 // For search
 char input_buf[MAX_INPUT_CHARS + 1] = "\0"; // plus one for null terminating character
@@ -47,16 +52,19 @@ void update_scrn_manager(Vector2 mouse_pos){
     if (btn_pressed(mouse_pos, &home)) {
         g_scrollOffset = letter_count = 0;
         input_buf[0] = '\0';
+        is_popup_open = removing_song = adding_song = 0;
         current_scene = SCENE_HOME;
         printf("Changed to home scene\n");
     }else if (btn_pressed(mouse_pos, &lib)) {
         g_scrollOffset = letter_count = 0;
         input_buf[0] = '\0';
+        is_popup_open = 0;
         current_scene = SCENE_LIBRARY;
         printf("Changed to library scene\n");
     }else if (btn_pressed(mouse_pos, &search)) {
         g_scrollOffset = letter_count = 0;
         input_buf[0] = '\0';
+        is_popup_open = 0;
         current_scene = SCENE_DOWNLOAD;
         printf("Changed to download scene\n");
     }
@@ -103,16 +111,64 @@ bool found_in_playlist(Playlist* playlist, char name[MAX_FNAME_LEN]){
     return 0;
 }
 
+void remove_song_from_playlist(Playlist* playlist, char* song_to_remove) {
+    int i, j;
+
+    for(i=0; i<playlist->size; ++i){
+        if(strMatch(playlist->song_names[i], song_to_remove)) {
+            for(j=i; j<playlist->size-1; ++j) {
+                strcpy(playlist->song_names[j], playlist->song_names[j + 1]);
+            }
+            --playlist->size;
+            break;
+        }
+    }
+}
+
+
+int create_option_popup(Font* font, Rectangle* options_box, char options[MAX_PLAYLISTS][MAX_PLAYNAME+1], int num_options, Vector2 mouse_pos) {
+    if(num_options<=0){
+        printf("NO OPTIONS AVAILABLE\n");
+        return -2; // exit popup
+    }
+    int i;
+    int selected_option = -1;
+    bool collision;
+
+    for(i=0; i<num_options; ++i){
+        Rectangle option_box = {
+            options_box->x,
+            options_box->y + i * (options_box->height / num_options),
+            options_box->width,
+            options_box->height / num_options
+        };
+
+        collision = CheckCollisionPointRec(mouse_pos, option_box);
+        DrawRectangleRec(option_box, collision ? LIGHTGRAY : GRAY);
+        DrawTextEx(*font, options[i], (Vector2){ option_box.x + 10, option_box.y + 10 }, 20, 1, BLACK);
+
+        if (collision && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            selected_option = i;
+            break;
+        }
+    }
+    if(IsKeyPressed(KEY_LEFT)) return -2;
+
+    return selected_option;
+}
+
 // include songbook for current_song and is_playing.
 // song_list_to_show is for what songs are shown on the list
 void song_scroll(Font* font, SoundMeta** current_song, AllSongs* song_list, AllSongs* queue, Playlist* playlists[MAX_PLAYLISTS],
-        Vector2 mouse_pos, int x, int y, int ITEM_HEIGHT, int VISIBLE_ITEMS, bool disable_scroll) {
+        Vector2 mouse_pos, int x, int y, int ITEM_HEIGHT, int VISIBLE_ITEMS, bool no_scroll_for_queue) {
+
     const float scrollSpeed = 4.0f;
 
     int num_songs_shown = playlists[song_list->playlist]->size;
 
     float max_scroll = num_songs_shown;
 
+    bool collision;
     int gap = 5;
     int i, j, startY, visible_item_len = VISIBLE_ITEMS*(ITEM_HEIGHT+gap);
     int temp_ind;
@@ -121,74 +177,78 @@ void song_scroll(Font* font, SoundMeta** current_song, AllSongs* song_list, AllS
     max_scroll = max_scroll*(ITEM_HEIGHT+gap) - visible_item_len + ITEM_HEIGHT;
     if (max_scroll < 0) max_scroll = 0;
 
-    if(!disable_scroll && num_songs_shown >= VISIBLE_ITEMS) g_scrollOffset -= GetMouseWheelMove() * scrollSpeed;
 
-    if (!disable_scroll && num_songs_shown>=VISIBLE_ITEMS && g_scrollOffset < 0) g_scrollOffset = 0;
-    if (!disable_scroll && num_songs_shown>=VISIBLE_ITEMS && g_scrollOffset > max_scroll) g_scrollOffset = max_scroll;
+    // Only scroll if popup is not open, and we enable scroll 
+    if(!is_popup_open && !no_scroll_for_queue && num_songs_shown >= VISIBLE_ITEMS) g_scrollOffset -= GetMouseWheelMove() * scrollSpeed;
 
-    startY = (disable_scroll || num_songs_shown<VISIBLE_ITEMS)? 0: -g_scrollOffset;
+    if (!no_scroll_for_queue && num_songs_shown>=VISIBLE_ITEMS && g_scrollOffset < 0) g_scrollOffset = 0;
+    if (!no_scroll_for_queue && num_songs_shown>=VISIBLE_ITEMS && g_scrollOffset > max_scroll) g_scrollOffset = max_scroll;
+
+    startY = (no_scroll_for_queue || num_songs_shown<VISIBLE_ITEMS)? 0: -g_scrollOffset;
 
     for(i=0; i<song_list->size; ++i){
         temp = song_list->songs[i];
 
-        if(!found_in_playlist(playlists[song_list->playlist], temp->file_name)) {
-            if(disable_scroll){
-                printf("Cannot find %s inside: ", temp->file_name);
-                for(j=0;j<playlists[0]->size;++j){
-                    printf("%s, -- ", playlists[0]->song_names[j]);
-                }
-                printf("\n");
-            }
+        if(!found_in_playlist(playlists[song_list->playlist], temp->file_name)) { continue; }
+
+        if (startY < -ITEM_HEIGHT || startY >= visible_item_len-ITEM_HEIGHT) {
+            startY += ITEM_HEIGHT+gap;
+            // we found all the songs we need for now
+            if(startY > visible_item_len-ITEM_HEIGHT){ break; }
             continue;
         }
 
-        if (startY >= -ITEM_HEIGHT && startY < visible_item_len-ITEM_HEIGHT) {
+        Rectangle rect = { g_width / 4.0f + x, startY + 10 + y, no_scroll_for_queue?130:400, ITEM_HEIGHT };
 
-            Rectangle rect = { g_width / 4.0f + x, startY + 10 + y, disable_scroll?130:400, ITEM_HEIGHT };
+        collision = CheckCollisionPointRec(mouse_pos, rect);
+        DrawRectangleRec(rect, !is_popup_open && collision?GRAY:DARKGRAY);
+        if(!is_popup_open && collision){
 
-            if(CheckCollisionPointRec(mouse_pos, rect)){
-                DrawRectangleRec(rect, GRAY);
+            if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
+                printf("Changing song to: %s\n", temp->file_name);
+                if(current_song && *current_song){
+                    ma_sound_stop(&(*current_song)->audio);
+                }
+                *current_song = temp;
 
-                if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
-                    printf("Changing song to: %s\n", temp->file_name);
-                    if(current_song && *current_song){
-                        ma_sound_stop(&(*current_song)->audio);
-                    }
-                    *current_song = temp;
+                // restart the song and then play it
+                ma_sound_seek_to_pcm_frame(&(*current_song)->audio, 0);
+                ma_sound_start(&(*current_song)->audio);
+                song_list->playing = 1;
 
-                    // restart the song and then play it
-                    ma_sound_seek_to_pcm_frame(&(*current_song)->audio, 0);
-                    ma_sound_start(&(*current_song)->audio);
-                    song_list->playing = 1;
-                    
-                    // if it was in the queue, remove it
-                    temp_ind = find(queue, temp->file_name);
-                    if(temp_ind!=-1) remove_from_queue(queue, temp_ind);
-                    
-                }else if(IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && queue!=NULL){
-                    // Check if the song we just pressed already exists in the queue, if so, remove
-                    for(j=0;j<queue->size;++j){
-                        if(strMatch(queue->songs[j]->file_name, temp->file_name)){
-                            printf("Removing %s from queue\n", temp->file_name);
-                            remove_from_queue(queue, j);
-                            j=-1;
-                            break;
-                        }
-                    }
-                    // ADD TO QUEUE
-                    if(j!=-1){
-                        printf("Added song to queue in slot %d: %s\n", queue->size, temp->file_name);
-                        queue->songs[queue->size] = temp;
-                        ++queue->size;
+                // if it was in the queue, remove it
+                temp_ind = find(queue, temp->file_name);
+                if(temp_ind!=-1) remove_from_queue(queue, temp_ind);
+
+            }else if(IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && queue!=NULL){
+                // Check if the song we just pressed already exists in the queue, if so, remove
+                for(j=0;j<queue->size;++j){
+                    if(strMatch(queue->songs[j]->file_name, temp->file_name)){
+                        printf("Removing %s from queue\n", temp->file_name);
+                        remove_from_queue(queue, j);
+                        j=-1;
+                        break;
                     }
                 }
-            } else {
-                DrawRectangleRec(rect, DARKGRAY);
+                // ADD TO QUEUE
+                if(j!=-1){
+                    printf("Added song to queue in slot %d: %s\n", queue->size, temp->file_name);
+                    queue->songs[queue->size] = temp;
+                    ++queue->size;
+                }
+            }else if(!no_scroll_for_queue && IsKeyPressed(KEY_RIGHT)){
+                is_popup_open = true;
+                save_vect.x = g_width/4.0f + x;
+                save_vect.y = startY+10+y;
+
+                assert(sizeof(save_fname) <= sizeof(temp->file_name));
+                strcpy(save_fname, temp->file_name);
             }
-            DrawTextEx(*font, temp->file_name, 
-                    (Vector2){g_width / 4.0f + 10 + x, startY + ITEM_HEIGHT/2.0 + y + (disable_scroll?5:0)}, 
-                    ITEM_HEIGHT/2.0, 1, WHITE);
         }
+        DrawTextEx(*font, temp->file_name, 
+                (Vector2){g_width / 4.0f + 10 + x, startY + ITEM_HEIGHT/2.0 + y + (no_scroll_for_queue?5:0)}, 
+                ITEM_HEIGHT/2.0, 1, WHITE);
+
         startY += ITEM_HEIGHT+gap;
         // we found all the songs we need for now
         if(startY > visible_item_len-ITEM_HEIGHT){ break; }
@@ -201,15 +261,83 @@ void song_scroll(Font* font, SoundMeta** current_song, AllSongs* song_list, AllS
         visible_item_len+19+ITEM_HEIGHT      // height
     };
     DrawRectangleLinesEx(perimeter, ITEM_HEIGHT+8 /* thickness */, (Color){20, 20, 20, 255});
+
+
+    // IMPORTANT: ONLY UPDATE this popup once per frame. Since song_scroll is called twice:
+    //  once for the main song list, and again for the queue -- we only want to call this chunk of code inside one of those calls
+    //  so if no_scroll_for_queue, it means we are in the call that is for the queue, and we should not go into this if-statement.
+    if(!no_scroll_for_queue && is_popup_open){
+        char sample_options[MAX_PLAYLISTS][MAX_PLAYNAME+1];
+        int num_options = 0;
+        if(removing_song){
+            // start at playlist 2 which is the first non-allsongs/placeholder playlist
+            // if found in the playlist, add it
+            for(i=2; i<MAX_PLAYLISTS && playlists[i]!=NULL; ++i){
+                if(found_in_playlist(playlists[i], save_fname)){
+                    assert(sizeof(sample_options[num_options]) >= sizeof(playlists[i]->name));
+                    strcpy(sample_options[num_options], playlists[i]->name);
+                    ++num_options;
+                }
+            }
+        }else if(adding_song){
+            // if not found in playlist
+            for(i=2; i<MAX_PLAYLISTS && playlists[i]!=NULL; ++i){
+                if(!found_in_playlist(playlists[i], save_fname)){
+                    assert(sizeof(sample_options[num_options]) >= sizeof(playlists[i]->name));
+                    strcpy(sample_options[num_options], playlists[i]->name);
+                    ++num_options;
+                }
+            }
+        }else{
+            assert(sizeof(sample_options[0]) >= sizeof("rm plylst"));
+            strcpy(sample_options[0], "rm plylst");
+            assert(sizeof(sample_options[1]) >= sizeof("+ plylst"));
+            strcpy(sample_options[1], "+ plylst");
+            num_options = 2;
+        }
+
+        Rectangle options_box = { save_vect.x + 250, save_vect.y , 120, 40*num_options };
+        int selected = create_option_popup(font, &options_box, sample_options, num_options, mouse_pos);
+
+        if(selected == -2){
+            printf("Closing popup\n");
+            is_popup_open = 0;
+            removing_song = adding_song = 0;
+        }else if(selected!=-1 && removing_song){
+            printf("SELECTED: %d\n", selected);
+            printf("Removing %s song from playlist: %s\n", save_fname, sample_options[selected]);
+            remove_song_from_playlist(playlists[selected+2], save_fname);
+            removing_song = false; // no longer removing a song
+            is_popup_open = 0;
+        }else if(selected!=-1 && adding_song){
+            printf("Adding song %s to selected playlist: %s\n", save_fname, sample_options[selected]);
+            assert(sizeof(playlists[selected+2]->song_names[playlists[selected+2]->size]) >= sizeof(save_fname));
+            strcpy(playlists[selected+2]->song_names[playlists[selected+2]->size], save_fname);
+            playlists[selected+2]->every_song = ++playlists[selected+2]->size == playlists[1]->size;
+
+            adding_song = false; // no longer adding a song
+            is_popup_open = 0;
+        }else if(!adding_song && !removing_song && (selected==0 || selected==1)){
+            printf("CHOSEN %d\n", selected);
+            if(selected == 0){
+                // remove song from playlist
+                removing_song = true; adding_song = false;
+            }else if(selected == 1){
+                // add song to playlist
+                adding_song = true; removing_song = false;
+            }
+        }
+    }
 }
 
 
-bool create_search_bar(Rectangle* search_bar,  Vector2 mouse_pos){
+bool create_typing_popup(Rectangle* type_box,  Vector2 mouse_pos, int buf_size, bool require_hover){
+    assert(buf_size <= sizeof(input_buf)-1); // we dont want to overflow input_buf
     int key, clipboard_len;
     const char* clipboard_text;
 
-    mouse_on_search = CheckCollisionPointRec(mouse_pos, *search_bar);
-    if(mouse_on_search){
+    if(require_hover) mouse_on_search = CheckCollisionPointRec(mouse_pos, *type_box);
+    if(!require_hover || mouse_on_search){
         SetMouseCursor(MOUSE_CURSOR_IBEAM);
         ++frame_count;
 
@@ -218,7 +346,7 @@ bool create_search_bar(Rectangle* search_bar,  Vector2 mouse_pos){
         // check if more characters have been pressed on the same frame
         while (key > 0){
             // only allow keys within: [32..125]
-            if ((key >= 32) && (key <= 125) && (letter_count < MAX_INPUT_CHARS)){
+            if ((key >= 32) && (key <= 125) && (letter_count < buf_size)){
                 input_buf[letter_count] = (char)key;
                 input_buf[letter_count+1] = '\0';
                 ++letter_count;
@@ -236,7 +364,7 @@ bool create_search_bar(Rectangle* search_bar,  Vector2 mouse_pos){
             clipboard_text = GetClipboardText();
             if (clipboard_text) {
                 clipboard_len = strlen(clipboard_text);
-                if (letter_count + clipboard_len < MAX_INPUT_CHARS) {
+                if (letter_count + clipboard_len < buf_size) {
                     strcat(input_buf, clipboard_text);
                     letter_count += clipboard_len;
                 }
@@ -256,12 +384,7 @@ void draw_search_bar(Font* font, Rectangle* search_bar){
     DrawRectangleRounded(*search_bar, 0.5f, 8, GRAY);
     
     if(letter_count == 0){
-        DrawTextEx(*font, "Hover to type", 
-                (Vector2){search_bar->x+10, search_bar->y+10}, 
-                20, 
-                1, 
-                DARKGRAY
-                );
+        DrawTextEx(*font, "Hover to type", (Vector2){search_bar->x+10, search_bar->y+10}, 20, 1, DARKGRAY);
     }
 
     if (mouse_on_search) DrawRectangleRoundedLines(*search_bar, 0.5f, 8, 2, DARKBLUE);
@@ -285,7 +408,7 @@ void draw_download(Font* font, AllSongs* songbook, Playlist* playlist[MAX_PLAYLI
     int i, y_offset;
     char cmd[150 + MAX_INPUT_CHARS];
     Rectangle search_bar = {(g_width-400)/2.0f, 60, 400, 40};
-    if(create_search_bar(&search_bar, mouse_pos)){
+    if(create_typing_popup(&search_bar, mouse_pos, MAX_INPUT_CHARS, true)){
         // try to download this char using cmd:
         snprintf(cmd, sizeof(cmd), "yt-dlp -o '%%(title)s.%%(ext)s' -x --audio-format mp3 --audio-quality 0 \"https://www.youtube.com/watch?v=%s\" -P \"music/\"", input_buf);
         printf("Attempting command: %s\n", cmd);
@@ -332,6 +455,7 @@ void draw_library(Font* font, AllSongs* songbook, Playlist* playlists[MAX_PLAYLI
     int y = 100;
     int font_size = 15;
     bool removed_playlist_inframe = 0;
+    bool collision;
 
     Rectangle square;
     Vector2 text_size, text_position;
@@ -346,10 +470,11 @@ void draw_library(Font* font, AllSongs* songbook, Playlist* playlists[MAX_PLAYLI
         text_position.x = square.x + (square.width - text_size.x) / 2;
         text_position.y = square.y + (square.height - text_size.y) / 2;
 
-        DrawRectangleRounded(square, 0.5f, 8, DARKGRAY);
+        collision = CheckCollisionPointRec(mouse_pos, square);
+        DrawRectangleRounded(square, 0.5f, 8, collision ? GRAY : DARKGRAY);
         DrawTextEx(*font, playlists[i]->name, text_position, font_size, 1, RAYWHITE);
 
-        if (CheckCollisionPointRec(mouse_pos, square)) {
+        if (collision) {
             if(IsMouseButtonPressed(MOUSE_LEFT_BUTTON)){
                 songbook->playlist = i;
                 printf("Moving to playlist #%d\n", i);
@@ -358,7 +483,7 @@ void draw_library(Font* font, AllSongs* songbook, Playlist* playlists[MAX_PLAYLI
                 if(strMatch(playlists[i]->name, "All Songs")){
                     printf("Cannot remove \"All Songs\" playlist\n");
                 }else{
-                    remove_from_playlist(playlists, i);
+                    remove_playlist(playlists, i);
                     printf("Removing playlist #%d\n", i);
 
                     // if we just deleted the playlist that we were on, just go back to All Songs.
@@ -397,9 +522,10 @@ void draw_library(Font* font, AllSongs* songbook, Playlist* playlists[MAX_PLAYLI
     text_position.x = square.x + (square.width - text_size.x) / 2;
     text_position.y = square.y + (square.height - text_size.y) / 2;
 
-    DrawRectangleRounded(square, 0.5f, 8, DARKGRAY);
+    collision = CheckCollisionPointRec(mouse_pos, square);
+    DrawRectangleRounded(square, 0.5f, 8, collision?GRAY:DARKGRAY);
     DrawTextEx(*font, "+", text_position, font_size, 1, RAYWHITE);
-    if (CheckCollisionPointRec(mouse_pos, square) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+    if (collision && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
         printf("Adding new playlist\n");
         is_popup_open = true;
         input_buf[0]='\0';
@@ -411,34 +537,9 @@ void draw_library(Font* font, AllSongs* songbook, Playlist* playlists[MAX_PLAYLI
         square.y = g_height/2.0 - 50;
         square.width = 300;
         square.height = 100;
-        DrawRectangleRounded(square, 0.1f, 8, GRAY);
-
-        DrawTextEx(*font, "Enter playlist name:", (Vector2){square.x + 10, square.y + 10}, 20, 1, RAYWHITE);
-        DrawTextEx(*font, input_buf, (Vector2){square.x + 10, square.y + 40}, 20, 1, RAYWHITE);
-
-        key = GetCharPressed();
-
-        // check if more characters have been pressed on the same frame
-        assert(MAX_PLAYNAME < sizeof(input_buf)-1); // we dont want to overflow input_buf
-        while (key > 0){
-            // only allow keys within: [32..125]
-            if ((key >= 32) && (key <= 125) && (letter_count < MAX_PLAYNAME)){
-                input_buf[letter_count] = (char)key;
-                input_buf[++letter_count] = '\0';
-            }
-
-            // check next character in the queue
-            key = GetCharPressed();
-        }
-
-        // Handle backspace
-        if (IsKeyPressed(KEY_BACKSPACE) && letter_count > 0) {
-            input_buf[--letter_count] = '\0';
-        }
-
-        // Handle submission (e.g., pressing Enter)
-        if (IsKeyPressed(KEY_ENTER)) {
+        if(create_typing_popup(&square, mouse_pos, MAX_PLAYNAME, false)){
             printf("Playlist name entered: %s\n", input_buf);
+
             // see if there already exists a playlist with that name
             for(i=0;i<MAX_PLAYLISTS && playlists[i]!=NULL;++i){
                 if(strMatch(playlists[i]->name, input_buf)){
@@ -460,6 +561,10 @@ void draw_library(Font* font, AllSongs* songbook, Playlist* playlists[MAX_PLAYLI
 
             is_popup_open = false;
         }
+        DrawRectangleRounded(square, 0.1f, 8, GRAY);
+
+        DrawTextEx(*font, "Enter playlist name:", (Vector2){square.x + 10, square.y + 10}, 20, 1, RAYWHITE);
+        DrawTextEx(*font, input_buf, (Vector2){square.x + 10, square.y + 40}, 20, 1, RAYWHITE);
 
         // TODO: diasable raylib exit application on ESC
         if(IsKeyPressed(KEY_ESCAPE)) is_popup_open = false;
@@ -537,8 +642,7 @@ void draw_home(Font* font, AllSongs* songbook, AllSongs* queue, Playlist* playli
 
     Rectangle search_bar = {(g_width-400)/2.0f, 20, 400, 40};
     // check if KEY_ENTER was pressed
-    // TODO: ONLY SEARCH WITHIN THE CURRENT PLAYLIST
-    if(create_search_bar(&search_bar, mouse_pos)){
+    if(create_typing_popup(&search_bar, mouse_pos, MAX_INPUT_CHARS, true)){
         printf("Searching for: %s\n", input_buf);
         if(!found_in_playlist(playlists[songbook->playlist], input_buf)){
             search_song = NULL;

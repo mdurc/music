@@ -32,11 +32,12 @@ void remove_from_queue(AllSongs* queue, int i){
     for(;i<queue->size-1;++i){
         queue->songs[i] = queue->songs[i+1];
     }
+    queue->songs[queue->size-1] = NULL;
     --queue->size;
 }
 
 
-void remove_from_playlist(Playlist* playlist[MAX_PLAYLISTS], int i){
+void remove_playlist(Playlist* playlist[MAX_PLAYLISTS], int i){
     free(playlist[i]);
     playlist[i] = NULL;
     for(;i<MAX_PLAYLISTS-1;++i){
@@ -261,6 +262,7 @@ int main(){
     strcpy(playlists[2]->song_names[0], "Lemon.mp3");
     playlists[2]->size = 1;
     playlists[2]->every_song = 0;
+
 
 
 
