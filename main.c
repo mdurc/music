@@ -7,6 +7,9 @@
 #define MINIAUDIO_IMPLEMENTATION
 #include "scene_manager.h"
 
+// TODO: add songs to playlist
+// TODO: playlist persistance
+
 ma_engine engine;
 
 bool strMatch(char* a, char* b){ return strcmp(a,b)==0 && strlen(a)==strlen(b); }
@@ -35,6 +38,7 @@ void remove_from_queue(AllSongs* queue, int i){
 
 void remove_from_playlist(Playlist* playlist[MAX_PLAYLISTS], int i){
     free(playlist[i]);
+    playlist[i] = NULL;
     for(;i<MAX_PLAYLISTS-1;++i){
         playlist[i] = playlist[i+1];
     }
@@ -76,18 +80,22 @@ void parse_sound(const char* filepath, const char* filename, SoundMeta* sound, m
 }
 
 
-// TODO: is this necessary
 bool btn_pressed(Vector2 mouse_pos, Rectangle* btn){
     return CheckCollisionPointRec(mouse_pos, *btn) && IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
 }
 
 
 
-// TODO: do this
-void clear_mem(AllSongs* songbook){
+void clear_mem(AllSongs* songbook, Playlist* playlists[MAX_PLAYLISTS]){
     int i;
-    for(i=0;i<MAX_SONGS;++i){
-        //free(songbook[i]);
+    for(i=0;i<songbook->size;++i){
+        ma_sound_uninit(&songbook->songs[i]->audio);
+        free(songbook->songs[i]);
+        songbook->songs[i] = NULL;
+    }
+    for(i=0;i<MAX_PLAYLISTS && playlists[i]!=NULL;++i){
+        free(playlists[i]);
+        playlists[i] = NULL;
     }
 }
 
@@ -122,11 +130,10 @@ void load_songs_from_directory( const char* dir_path, AllSongs* songbook,
 
             if(find(songbook, filename) == -1){
                 printf("Adding new song #%d: %s\n",i, filename);
-                SoundMeta* new_song = malloc(sizeof(SoundMeta));
-                if (new_song == NULL) { perror("malloc"); continue; }
+                songbook->songs[songbook->size] = malloc(sizeof(SoundMeta));
+                if (songbook->songs[songbook->size] == NULL) { perror("malloc"); continue; }
 
-                parse_sound(file_path, filename, new_song, engine);
-                songbook->songs[songbook->size] = new_song;
+                parse_sound(file_path, filename, songbook->songs[songbook->size], engine);
                 ++songbook->size;
 
                 assert(sizeof(all_songs->song_names[all_songs->size]) >= sizeof(filename));
@@ -190,9 +197,11 @@ int main(){
 
     int i;
     // potentially put songbook and queue on heap
-    AllSongs songbook;
-    AllSongs queue;
-    Playlist* playlists[MAX_PLAYLISTS];
+    AllSongs songbook = { .songs = {NULL}, .current_song = NULL, .size=0, .playlist=1, .playing=0 };
+    AllSongs queue = { .songs = {NULL}, .current_song = NULL, .size=0, .playlist=0, .playing=0 };
+
+    // start them all un-initialized. Only malloc once a new playlist is required.
+    Playlist* playlists[MAX_PLAYLISTS] = {NULL};
 
 
     const int WIDTH = 800;
@@ -218,7 +227,7 @@ int main(){
         exit(EXIT_FAILURE);
     }
 
-    //  =======
+    // =======
     // Opengl Context
     SetTraceLogLevel(LOG_ERROR); // Hide logs in raylib init to console
     InitWindow(WIDTH, HEIGHT, "Rythme");
@@ -234,17 +243,6 @@ int main(){
 
     sample_rate = engine.sampleRate;
 
-    // INITILIZE
-    for(i=0; i<MAX_SONGS; ++i){
-        songbook.songs[i] = NULL;
-        if(i<MAX_SONGS) queue.songs[i] = NULL;
-        if(i<MAX_PLAYLISTS) playlists[i] = NULL; // start them all un-initialized. Only malloc once a new playlist is required.
-    }
-    songbook.size = 0;
-    songbook.playlist = 1;
-    songbook.current_song = NULL;
-    songbook.playing = false;
-    queue.size = 0;
 
     // playlists[0] is reserved for queue and match_list
     playlists[0] = malloc(sizeof(Playlist));
@@ -290,7 +288,8 @@ int main(){
         EndDrawing();
     }
 
-    clear_mem(&songbook);
+    clear_mem(&songbook, playlists);
+    UnloadFont(font);
     ma_engine_uninit(&engine);
     CloseWindow();
 
