@@ -155,18 +155,26 @@ void reload_music_dir(AllSongs* songbook, Playlist* all_songs){
 }
 
 
-void next_in_queue(AllSongs* songbook, AllSongs* queue){
+void next_in_queue(AllSongs* songbook, AllSongs* queue, Playlist* playlists[MAX_PLAYLISTS]){
     if(queue->size > 0){
         printf("Playing next song in queue: %s\n", queue->songs[0]->file_name);
 
         if(songbook->current_song!=NULL && ma_sound_is_playing(&songbook->current_song->audio)) ma_sound_stop(&songbook->current_song->audio);
         songbook->current_song = queue->songs[0];
+
+        ma_sound_seek_to_pcm_frame(&songbook->current_song->audio, 0);
         if(songbook->playing){ usleep(400000); ma_sound_start(&songbook->current_song->audio); }
 
         remove_from_queue(queue, 0);
     }else if(songbook->size > 0){
-        if(ma_sound_is_playing(&songbook->current_song->audio)) ma_sound_stop(&songbook->current_song->audio);
-        songbook->current_song = songbook->songs[rand()%songbook->size];
+        if(songbook->current_song!=NULL && ma_sound_is_playing(&songbook->current_song->audio)) ma_sound_stop(&songbook->current_song->audio);
+
+        // find random song in current playlist
+        char* temp = playlists[songbook->playlist]->song_names[rand()%playlists[songbook->playlist]->size];
+        songbook->current_song = songbook->songs[find(songbook, temp)];
+
+        // restart song before playing
+        ma_sound_seek_to_pcm_frame(&songbook->current_song->audio, 0);
         if(songbook->playing){ usleep(400000); ma_sound_start(&songbook->current_song->audio); }
 
         printf("Playing random song: %s\n", songbook->current_song->file_name);
@@ -175,7 +183,7 @@ void next_in_queue(AllSongs* songbook, AllSongs* queue){
     }
 }
 
-void handle_arrows(Vector2 mouse_pos, Vector2 text_size, Vector2 left_arrow_pos, Vector2 right_arrow_pos, AllSongs* songbook, AllSongs* queue){
+void handle_arrows(Vector2 mouse_pos, Vector2 text_size, Vector2 left_arrow_pos, Vector2 right_arrow_pos, AllSongs* songbook, AllSongs* queue, Playlist* playlists[MAX_PLAYLISTS]){
     bool left_arrow_pressed, right_arrow_pressed;
     float new_time;
 
@@ -189,7 +197,7 @@ void handle_arrows(Vector2 mouse_pos, Vector2 text_size, Vector2 left_arrow_pos,
         if(songbook->playing){ usleep(400000); ma_sound_start(&songbook->current_song->audio); }
     }
     else if (right_arrow_pressed && IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-        next_in_queue(songbook, queue);
+        next_in_queue(songbook, queue, playlists);
     }
 }
 
@@ -275,9 +283,9 @@ int main(){
 
         handle_audio(mouse_pos, play_btn_center, play_btn_radius, left_arrow_pos, right_arrow_pos, &playback_line,
                 &songbook.playing, &progress, &dragging_scrubber, songbook.current_song, sample_rate);
-        handle_arrows(mouse_pos, text_size, left_arrow_pos, right_arrow_pos, &songbook, &queue);
+        handle_arrows(mouse_pos, text_size, left_arrow_pos, right_arrow_pos, &songbook, &queue, playlists);
 
-        if(progress == 1) next_in_queue(&songbook, &queue);
+        if(progress == 1) next_in_queue(&songbook, &queue, playlists);
 
         update_scrn_manager(mouse_pos);
 

@@ -18,5 +18,6 @@ typedef struct {
 void init_scrn_manager(const int WIDTH, const int HIEGHT);
 void update_scrn_manager(Vector2 mouse_pos);
 void draw_scene(Font* font, AllSongs* songbook, AllSongs* queue, Playlist* playlists[MAX_PLAYLISTS], Vector2 mouse_pos);
+bool found_in_playlist(Playlist* playlist, char name[MAX_FNAME_LEN]);
 
 #endif
