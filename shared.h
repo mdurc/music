@@ -29,8 +29,8 @@ typedef struct {
 } AllSongs;
 
 typedef struct {
-    char name[MAX_FNAME_LEN];
-    char song_names[MAX_SONGS][MAX_FNAME_LEN];
+    char name[MAX_PLAYNAME + 1]; // for null term
+    char song_names[MAX_SONGS][256];
     int size;
 
     // for if we want the playlist to be every single song downloaded,
@@ -39,6 +39,7 @@ typedef struct {
 } Playlist;
 
 
+bool strMatch(char* a, char* b);
 
 int find(AllSongs* songbook, char* file_name);
 void parse_sound(const char* filepath, const char* filename, SoundMeta* sound, ma_engine* engine);

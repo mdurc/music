@@ -1,8 +1,10 @@
 #include "scene_manager.h"
+#include <CoreAudio/CoreAudio.h>
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "shared.h"
 
 
 #define SIDEBAR_WIDTH 60
@@ -94,8 +96,7 @@ bool found_in_playlist(Playlist* playlist, char name[MAX_FNAME_LEN]){
 
     int i;
     for(i=0; i<playlist->size; ++i){
-        if( strcmp(playlist->song_names[i], name)==0 &&
-            strlen(playlist->song_names[i]) == strlen(name)){
+        if(strMatch(playlist->song_names[i], name)){
             return 1;
         }
     }
@@ -104,34 +105,42 @@ bool found_in_playlist(Playlist* playlist, char name[MAX_FNAME_LEN]){
 
 // include songbook for current_song and is_playing.
 // song_list_to_show is for what songs are shown on the list
-void song_scroll(Font* font, AllSongs* songbook, AllSongs* queue, Playlist* playlists[MAX_PLAYLISTS],
+void song_scroll(Font* font, SoundMeta** current_song, AllSongs* song_list, AllSongs* queue, Playlist* playlists[MAX_PLAYLISTS],
         Vector2 mouse_pos, int x, int y, int ITEM_HEIGHT, int VISIBLE_ITEMS, bool disable_scroll) {
     const float scrollSpeed = 4.0f;
 
-    int num_songs_shown = playlists[songbook->playlist]->size;
+    int num_songs_shown = playlists[song_list->playlist]->size;
 
     float max_scroll = num_songs_shown;
 
     int gap = 5;
-    int i, startY, visible_item_len = VISIBLE_ITEMS*(ITEM_HEIGHT+gap);
+    int i, j, startY, visible_item_len = VISIBLE_ITEMS*(ITEM_HEIGHT+gap);
     int temp_ind;
     SoundMeta* temp;
 
     max_scroll = max_scroll*(ITEM_HEIGHT+gap) - visible_item_len + ITEM_HEIGHT;
     if (max_scroll < 0) max_scroll = 0;
 
-    if(num_songs_shown >= VISIBLE_ITEMS) g_scrollOffset -= GetMouseWheelMove() * scrollSpeed;
+    if(!disable_scroll && num_songs_shown >= VISIBLE_ITEMS) g_scrollOffset -= GetMouseWheelMove() * scrollSpeed;
 
-    if (num_songs_shown>=VISIBLE_ITEMS && g_scrollOffset < 0) g_scrollOffset = 0;
-    if (num_songs_shown>=VISIBLE_ITEMS && g_scrollOffset > max_scroll) g_scrollOffset = max_scroll;
+    if (!disable_scroll && num_songs_shown>=VISIBLE_ITEMS && g_scrollOffset < 0) g_scrollOffset = 0;
+    if (!disable_scroll && num_songs_shown>=VISIBLE_ITEMS && g_scrollOffset > max_scroll) g_scrollOffset = max_scroll;
 
     startY = (disable_scroll || num_songs_shown<VISIBLE_ITEMS)? 0: -g_scrollOffset;
 
-    for(i=0; i<songbook->size; ++i){
-        temp = songbook->songs[i];
+    for(i=0; i<song_list->size; ++i){
+        temp = song_list->songs[i];
 
-        // !disable_scroll means that we are in the queue. We dont want to validate the queue
-        if(!found_in_playlist(playlists[songbook->playlist], temp->file_name)) continue;
+        if(!found_in_playlist(playlists[song_list->playlist], temp->file_name)) {
+            if(disable_scroll){
+                printf("Cannot find %s inside: ", temp->file_name);
+                for(j=0;j<playlists[0]->size;++j){
+                    printf("%s, -- ", playlists[0]->song_names[j]);
+                }
+                printf("\n");
+            }
+            continue;
+        }
 
         if (startY >= -ITEM_HEIGHT && startY < visible_item_len-ITEM_HEIGHT) {
 
@@ -142,32 +151,33 @@ void song_scroll(Font* font, AllSongs* songbook, AllSongs* queue, Playlist* play
 
                 if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT)){
                     printf("Changing song to: %s\n", temp->file_name);
-                    if(songbook->current_song){
-                        ma_sound_stop(&songbook->current_song->audio);
+                    if(current_song && *current_song){
+                        ma_sound_stop(&(*current_song)->audio);
                     }
-                    songbook->current_song = temp;
+                    *current_song = temp;
 
                     // restart the song and then play it
-                    ma_sound_seek_to_pcm_frame(&songbook->current_song->audio, 0);
-                    ma_sound_start(&songbook->current_song->audio);
-                    songbook->playing = 1;
+                    ma_sound_seek_to_pcm_frame(&(*current_song)->audio, 0);
+                    ma_sound_start(&(*current_song)->audio);
+                    song_list->playing = 1;
                     
                     // if it was in the queue, remove it
                     temp_ind = find(queue, temp->file_name);
                     if(temp_ind!=-1) remove_from_queue(queue, temp_ind);
                     
                 }else if(IsMouseButtonPressed(MOUSE_BUTTON_RIGHT) && queue!=NULL){
-                    // ADD TO QUEUE
-                    for(i=0;i<queue->size;++i){
-                        if(queue->songs[i]->file_name == temp->file_name){
+                    // Check if the song we just pressed already exists in the queue, if so, remove
+                    for(j=0;j<queue->size;++j){
+                        if(strMatch(queue->songs[j]->file_name, temp->file_name)){
                             printf("Removing %s from queue\n", temp->file_name);
-                            remove_from_queue(queue, i);
-                            i=-1;
+                            remove_from_queue(queue, j);
+                            j=-1;
                             break;
                         }
                     }
-                    if(i!=-1){
-                        printf("Added song to queue: %s\n", temp->file_name);
+                    // ADD TO QUEUE
+                    if(j!=-1){
+                        printf("Added song to queue in slot %d: %s\n", queue->size, temp->file_name);
                         queue->songs[queue->size] = temp;
                         ++queue->size;
                     }
@@ -345,8 +355,7 @@ void draw_library(Font* font, AllSongs* songbook, Playlist* playlists[MAX_PLAYLI
                 printf("Moving to playlist #%d\n", i);
             }else if(IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)){
                 //TODO: instead of right clicking everywhere, just add an elipses that opens an options popup to take different actions
-                if(strcmp(playlists[i]->name, "All Songs")==0 &&
-                    strlen(playlists[i]->name)==strlen("All Songs")){
+                if(strMatch(playlists[i]->name, "All Songs")){
                     printf("Cannot remove \"All Songs\" playlist\n");
                 }else{
                     remove_from_playlist(playlists, i);
@@ -427,8 +436,7 @@ void draw_library(Font* font, AllSongs* songbook, Playlist* playlists[MAX_PLAYLI
             printf("Playlist name entered: %s\n", input_buf);
             // see if there already exists a playlist with that name
             for(i=0;i<MAX_PLAYLISTS && playlists[i]!=NULL;++i){
-                if( strcmp(playlists[i]->name, input_buf)==0 &&
-                    strlen(playlists[i]->name)==letter_count){
+                if(strMatch(playlists[i]->name, input_buf)){
                     printf("Playlist name already exists: %s\n", input_buf);
                     // return before allocating and leaving the popup
                     return;
@@ -459,6 +467,8 @@ void draw_home(Font* font, AllSongs* songbook, AllSongs* queue, Playlist* playli
     int i, temp_ind, match_count=0;
     SoundMeta* temp;
     SoundMeta* first_match;
+    char* current_song_name;
+    size_t song_name_size;
 
     // index 0 of playlist should be allocated in main
     assert(playlists[0]!=NULL);
@@ -478,23 +488,32 @@ void draw_home(Font* font, AllSongs* songbook, AllSongs* queue, Playlist* playli
 
         temp_ind = songbook->playlist;
         songbook->playlist = 0;
-        song_scroll(font, songbook, queue, playlists, mouse_pos, -70, 100, 40, 5, false);
+        song_scroll(font, &songbook->current_song, songbook, queue, playlists, mouse_pos, -70, 100, 40, 5, false);
         songbook->playlist = temp_ind;
     }else{
-        song_scroll(font, songbook, queue, playlists , mouse_pos, -70, 100, 40, 5, false);
+        song_scroll(font, &songbook->current_song, songbook, queue, playlists , mouse_pos, -70, 100, 40, 5, false);
     }
 
     // DRAW QUEUE
+    // first fill playlist[0] with queue
     playlists[0]->size = 0;
     playlists[0]->every_song = 0;
     for(i=0;i<queue->size;++i){
-        strcpy(playlists[0]->song_names[playlists[0]->size], queue->songs[i]->file_name);
+
+        // alias for the playlist name that we want to populate
+        current_song_name = playlists[0]->song_names[playlists[0]->size];
+        song_name_size = sizeof(playlists[0]->song_names[playlists[0]->size]);
+
+        // populate and ensure memory safety
+        strncpy(current_song_name, queue->songs[i]->file_name, song_name_size - 1);
+        current_song_name[song_name_size - 1] = '\0';
+
         ++playlists[0]->size;
     }
-    temp_ind = songbook->playlist;
-    songbook->playlist = 0;
-    song_scroll(font, songbook, queue, playlists, mouse_pos, 400, 100, 20, 5, true);
-    songbook->playlist = temp_ind;
+
+    // plug queue in, instead of songbooks, so that we only look for queue songs:
+    queue->playlist = 0;
+    song_scroll(font, &songbook->current_song, queue, queue, playlists, mouse_pos, 400, 100, 20, 5, true);
 
 
     Rectangle search_bar = {(g_width-400)/2.0f, 20, 400, 40};

@@ -9,6 +9,7 @@
 
 ma_engine engine;
 
+bool strMatch(char* a, char* b){ return strcmp(a,b)==0 && strlen(a)==strlen(b); }
 
 // return index in songbook
 int find(AllSongs* songbook, char* file_name){
@@ -148,7 +149,7 @@ void next_in_queue(AllSongs* songbook, AllSongs* queue){
     if(queue->size > 0){
         printf("Playing next song in queue: %s\n", queue->songs[0]->file_name);
 
-        if(ma_sound_is_playing(&songbook->current_song->audio)) ma_sound_stop(&songbook->current_song->audio);
+        if(songbook->current_song!=NULL && ma_sound_is_playing(&songbook->current_song->audio)) ma_sound_stop(&songbook->current_song->audio);
         songbook->current_song = queue->songs[0];
         if(songbook->playing){ usleep(400000); ma_sound_start(&songbook->current_song->audio); }
 
