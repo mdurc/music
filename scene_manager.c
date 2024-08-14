@@ -541,7 +541,6 @@ void draw_home(Font* font, AllSongs* songbook, AllSongs* queue, Playlist* playli
     if(create_search_bar(&search_bar, mouse_pos)){
         printf("Searching for: %s\n", input_buf);
         if(!found_in_playlist(playlists[songbook->playlist], input_buf)){
-            printf("Not found\n");
             search_song = NULL;
         }else{
             temp_ind = find(songbook, input_buf);

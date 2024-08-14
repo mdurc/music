@@ -129,6 +129,7 @@ void load_songs_from_directory( const char* dir_path, AllSongs* songbook,
                 songbook->songs[songbook->size] = new_song;
                 ++songbook->size;
 
+                assert(sizeof(all_songs->song_names[all_songs->size]) >= sizeof(filename));
                 strcpy(all_songs->song_names[all_songs->size], filename);
                 ++all_songs->size;
             }
