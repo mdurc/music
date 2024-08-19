@@ -292,6 +292,17 @@ void load_data(Playlist* playlists[MAX_PLAYLISTS]) {
     fclose(file);
 }
 
+
+void exit_program(Playlist* playlists[MAX_PLAYLISTS], AllSongs* songbook, Font* font){
+    clean_playlists(playlists, songbook);
+    save_data(playlists);
+    clear_mem(songbook, playlists);
+    UnloadFont(*font);
+    unload_textures();
+    ma_engine_uninit(&engine);
+    CloseWindow();
+}
+
 int main(){
     srand(time(NULL));
 
@@ -366,6 +377,9 @@ int main(){
 
 
     while (!WindowShouldClose()) {
+        if (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_D)) {
+            break;
+        }
 
         WIDTH = GetScreenWidth();
         HEIGHT = GetScreenHeight();
@@ -433,13 +447,7 @@ int main(){
         EndDrawing();
     }
 
-    clean_playlists(playlists, &songbook);
-    save_data(playlists);
-    clear_mem(&songbook, playlists);
-    UnloadFont(font);
-    unload_textures();
-    ma_engine_uninit(&engine);
-    CloseWindow();
+    exit_program(playlists, &songbook, &font);
 
     return 0;
 }
