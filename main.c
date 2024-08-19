@@ -408,6 +408,7 @@ int main(){
     save_data(playlists);
     clear_mem(&songbook, playlists);
     UnloadFont(font);
+    unload_textures();
     ma_engine_uninit(&engine);
     CloseWindow();
 

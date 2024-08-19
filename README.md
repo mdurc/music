@@ -1,4 +1,4 @@
-# Music Player (C with Raylib)
+# music player in c
 
 ## Features
 
@@ -6,7 +6,7 @@
   - Download songs directly within the app from a YouTube link.
   - Paste the code after `?v=` from `/watch?v=vZi8ET9k11g` into the app: `vZi8ET9k11g`
   - Use `Ctrl+V` to paste.
-  - Access the download feature through the blue tab on the sidebar.
+  - Access the download feature through the download button on the sidebar.
 
 - **Queue Management**
   - Add songs to the queue by right-clicking on a song in the list.
@@ -25,9 +25,9 @@
   - Create new playlists easily.
   - Add or remove songs from a playlist by pressing the right arrow key, when hovering over a song, and selecting an option from the popup. Exit any popup with `<Esc>`.
   - A default playlist, `All Songs`, holds all songs and is non-removable.
-  - Switch playlists via the library tab (green) and view content on the Home screen (red on sidebar).
   - Right-click any custom playlist to delete it.
   - Create new playlists with the onscreen `+` button, with a maximum playlist limit.
+  - Acces the playlists through the library icon on the sidebar
 
 - **Playlist Persistence**
   - Custom playlists are saved in `playlists.txt` and automatically loaded when you reopen the program.

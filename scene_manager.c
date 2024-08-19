@@ -11,9 +11,16 @@
 #define ICON_SIZE 40
 #define MAX_INPUT_CHARS 30 // size of youtube url
 
+
+Texture2D homeTexture;
+Texture2D libTexture;
+Texture2D downloadTexture;
+
+
+// Use rectangles to check for collision
 Rectangle home = {10, 10, ICON_SIZE, ICON_SIZE};
 Rectangle lib = {10, 60, ICON_SIZE, ICON_SIZE};
-Rectangle search = {10, 110, ICON_SIZE, ICON_SIZE};
+Rectangle download = {10, 110, ICON_SIZE, ICON_SIZE};
 SceneType current_scene = SCENE_HOME;
 
 int g_width, g_height;
@@ -45,7 +52,32 @@ void draw_download(Font* font, AllSongs* songbook, Playlist* playlist[MAX_PLAYLI
 
 
 
-void init_scrn_manager(const int WIDTH, const int HIEGHT){ g_width = WIDTH; g_height = HIEGHT; }
+void init_scrn_manager(const int WIDTH, const int HIEGHT){
+    g_width = WIDTH; g_height = HIEGHT;
+
+    Image home_img = LoadImage("resources/home.png");
+    ImageResize(&home_img, ICON_SIZE, ICON_SIZE);
+    homeTexture = LoadTextureFromImage(home_img);
+
+    Image lib_img = LoadImage("resources/library.png");
+    ImageResize(&lib_img, ICON_SIZE, ICON_SIZE);
+    libTexture = LoadTextureFromImage(lib_img);
+
+    Image down_img = LoadImage("resources/download.png");
+    ImageResize(&down_img, ICON_SIZE, ICON_SIZE);
+    downloadTexture = LoadTextureFromImage(down_img);
+
+    UnloadImage(home_img);
+    UnloadImage(lib_img);
+    UnloadImage(down_img);
+}
+
+
+void unload_textures() {
+    UnloadTexture(homeTexture);
+    UnloadTexture(libTexture);
+    UnloadTexture(downloadTexture);
+}
 
 void update_scrn_manager(Vector2 mouse_pos){
     if (btn_pressed(mouse_pos, &home)) {
@@ -60,7 +92,7 @@ void update_scrn_manager(Vector2 mouse_pos){
         is_popup_open = 0;
         current_scene = SCENE_LIBRARY;
         printf("Changed to library scene\n");
-    }else if (btn_pressed(mouse_pos, &search)) {
+    }else if (btn_pressed(mouse_pos, &download)) {
         g_scrollOffset = letter_count = 0;
         input_buf[0] = '\0';
         is_popup_open = 0;
@@ -87,15 +119,14 @@ void draw_scene(Font* font, AllSongs* songbook, AllSongs* queue, Playlist* playl
 }
 
 
-
-void draw_sidebar(){
-    DrawRectangle(0, 0, SIDEBAR_WIDTH, g_height, (Color){50, 50, 50, 255});
-
-    // Home, favorites, search
-    DrawRectangleRec(home, (Color){200, 0, 0, 255});
-    DrawRectangleRec(lib, (Color){0, 200, 0, 255});
-    DrawRectangleRec(search, (Color){0, 0, 200, 255});
+void draw_sidebar() {
+    DrawRectangle(0, 0, SIDEBAR_WIDTH, g_height, (Color){70, 70, 70, 255});
+    
+    DrawTexture(homeTexture, (int)home.x, (int)home.y, WHITE);
+    DrawTexture(libTexture, (int)lib.x, (int)lib.y, WHITE);
+    DrawTexture(downloadTexture, (int)download.x, (int)download.y, WHITE);
 }
+
 
 
 bool found_in_playlist(Playlist* playlist, char name[MAX_FNAME_LEN]){

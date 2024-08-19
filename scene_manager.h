@@ -20,5 +20,6 @@ void update_scrn_manager(Vector2 mouse_pos);
 void draw_scene(Font* font, AllSongs* songbook, AllSongs* queue, Playlist* playlists[MAX_PLAYLISTS], Vector2 mouse_pos);
 bool found_in_playlist(Playlist* playlist, char name[MAX_FNAME_LEN]);
 void remove_song_from_playlist(Playlist* playlist, char* song_to_remove);
+void unload_textures();
 
 #endif
