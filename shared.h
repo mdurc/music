@@ -5,9 +5,9 @@
 
 
 // MAKE SURE THAT THIS IS WHERE YOURE STORING DATA
-#include "libs/miniaudio.h"
-#define MUSIC_DIR "music/"
-#define PLAYLIST_FILE "playlists.txt"
+#include "/Users/mdurcan/personal/git_projects/rythme/libs/miniaudio.h"
+#define MUSIC_DIR "/Users/mdurcan/personal/git_projects/rythme/music/"
+#define PLAYLIST_FILE "/Users/mdurcan/personal/git_projects/rythme/playlists.txt"
 
 
 #define MAX_PLAYLISTS 6 // Will only actually allow MAX_PLAYLISTS-1 playlists bc index 0 is a placeholder

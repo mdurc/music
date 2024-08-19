@@ -55,15 +55,15 @@ void draw_download(Font* font, AllSongs* songbook, Playlist* playlist[MAX_PLAYLI
 void init_scrn_manager(const int WIDTH, const int HIEGHT){
     g_width = WIDTH; g_height = HIEGHT;
 
-    Image home_img = LoadImage("resources/home.png");
+    Image home_img = LoadImage("/Users/mdurcan/personal/git_projects/rythme/resources/home.png");
     ImageResize(&home_img, ICON_SIZE, ICON_SIZE);
     homeTexture = LoadTextureFromImage(home_img);
 
-    Image lib_img = LoadImage("resources/library.png");
+    Image lib_img = LoadImage("/Users/mdurcan/personal/git_projects/rythme/resources/library.png");
     ImageResize(&lib_img, ICON_SIZE, ICON_SIZE);
     libTexture = LoadTextureFromImage(lib_img);
 
-    Image down_img = LoadImage("resources/download.png");
+    Image down_img = LoadImage("/Users/mdurcan/personal/git_projects/rythme/resources/download.png");
     ImageResize(&down_img, ICON_SIZE, ICON_SIZE);
     downloadTexture = LoadTextureFromImage(down_img);
 

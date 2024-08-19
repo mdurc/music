@@ -317,6 +317,10 @@ int main(){
     float play_btn_radius = 15.0f;
 
     Vector2 mouse_pos;
+    Vector2 prev_mouse = {0,0};
+    Vector2 resize_start;
+    Vector2 window_pos = {100, 100};
+    bool drag_window = 0;
 
     //  =======
     // MINIAUDIO_IMPLEMENTATION
@@ -332,7 +336,9 @@ int main(){
     // Opengl Context
     SetTraceLogLevel(LOG_ERROR); // Hide logs in raylib init to console
     InitWindow(WIDTH, HEIGHT, "Rythme");
+    SetWindowState(FLAG_WINDOW_UNDECORATED);
     SetWindowState(FLAG_WINDOW_RESIZABLE);
+    SetWindowPosition((int)window_pos.x, (int)window_pos.y);
     SetTargetFPS(60);
     SetExitKey(0);
     Font font = LoadFont("/Users/mdurcan/Library/Fonts/UbuntuMono-B.ttf");
@@ -340,6 +346,7 @@ int main(){
 
     Vector2 text_size = MeasureTextEx(font, "->", 20, 1);
     Vector2 left_arrow_pos;
+
     Vector2 right_arrow_pos;
 
 
@@ -373,9 +380,10 @@ int main(){
             SetWindowSize(WIDTH, HEIGHT);
         }
 
+
+        // UPDATE UI
         playback_line.y = (HEIGHT - 50);
         playback_line.width = (WIDTH - 200);
-
         play_btn_center.x=WIDTH/2.0f;
         play_btn_center.y=HEIGHT-80;
         left_arrow_pos.x = (play_btn_center.x - play_btn_radius * 2 - text_size.x);
@@ -383,9 +391,30 @@ int main(){
         right_arrow_pos.x = (play_btn_center.x + play_btn_radius * 2);
         right_arrow_pos.y = (play_btn_center.y - text_size.y / 2.0f);
 
+
+        // check for window movement
+        mouse_pos = GetMousePosition();
+        if(IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !drag_window){
+            if(CheckCollisionPointRec(mouse_pos, (Rectangle){ 0, 0, WIDTH, 20 })){
+                drag_window = true;
+                resize_start = mouse_pos;
+            }
+        }
+
+        if (drag_window){
+            // Get rid of any drift if the mouse isn't moving
+            if(mouse_pos.x != prev_mouse.x && mouse_pos.y != prev_mouse.y){
+                window_pos.x += (mouse_pos.x - resize_start.x);
+                window_pos.y += (mouse_pos.y - resize_start.y);
+                SetWindowPosition((int)window_pos.x, (int)window_pos.y);
+            }
+            if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) drag_window = false;
+        }
+        prev_mouse = mouse_pos;
+
+
         init_scrn_manager(WIDTH, HEIGHT);
 
-        mouse_pos = GetMousePosition();
 
         handle_audio(mouse_pos, play_btn_center, play_btn_radius, left_arrow_pos, right_arrow_pos, &playback_line,
                 &songbook.playing, &progress, &dragging_scrubber, songbook.current_song, sample_rate);
