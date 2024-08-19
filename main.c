@@ -424,7 +424,7 @@ int main(){
                 &songbook.playing, &progress, &dragging_scrubber, songbook.current_song, sample_rate);
         handle_arrows(mouse_pos, text_size, left_arrow_pos, right_arrow_pos, &songbook, &queue, playlists);
 
-        if(progress == 1) next_in_queue(&songbook, &queue, playlists);
+        if((int)progress == 1) next_in_queue(&songbook, &queue, playlists);
 
         update_scrn_manager(mouse_pos);
 
