@@ -337,8 +337,9 @@ int main(){
     // Opengl Context
     SetTraceLogLevel(LOG_ERROR); // Hide logs in raylib init to console
     InitWindow(WIDTH, HEIGHT, "Rythme");
-    SetWindowState(FLAG_WINDOW_UNDECORATED);
+    //SetWindowState(FLAG_WINDOW_UNDECORATED);
     SetWindowState(FLAG_WINDOW_RESIZABLE);
+    SetConfigFlags(FLAG_WINDOW_ALWAYS_RUN);
     SetWindowPosition((int)window_pos.x, (int)window_pos.y);
     SetTargetFPS(60);
     SetExitKey(0);
