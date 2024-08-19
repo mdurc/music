@@ -444,6 +444,11 @@ void draw_download(Font* font, AllSongs* songbook, Playlist* playlist[MAX_PLAYLI
 
         output_line = 0;
         FILE *fp = popen(cmd, "r");
+
+        if(fp == NULL){
+            perror("popen failed");
+            return;
+        }
         while (fgets(output_buf[output_line], sizeof(output_buf[output_line]), fp) != NULL) { ++output_line; }
 
         i=songbook->size;
