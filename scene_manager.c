@@ -33,8 +33,7 @@ int output_line=0;
 
 int letter_count = 0, frame_count=0;
 bool mouse_on_search = false;
-bool flag_download_complete = false;
-bool flag_download_failed = false;
+int flag_download_success = -1;
 
 
 bool is_popup_open = false;
@@ -409,23 +408,20 @@ void draw_download(Font* font, AllSongs* songbook, Playlist* playlist[MAX_PLAYLI
     Rectangle search_bar = {(g_width-400)/2.0f, 60, 400, 40};
     if(create_typing_popup(&search_bar, mouse_pos, MAX_INPUT_CHARS, true)){
         // try to download this char using cmd:
-        snprintf(cmd, sizeof(cmd), "yt-dlp -o '%%(title)s.%%(ext)s' -x --audio-format mp3 --audio-quality 0 \"https://www.youtube.com/watch?v=%s\" -P \"music/\"", input_buf);
+        snprintf(cmd, sizeof(cmd), "yt-dlp -o '%%(title)s.%%(ext)s' -x --audio-format mp3 --audio-quality 0 \"https://www.youtube.com/watch?v=%s\" -P %s", input_buf, MUSIC_DIR);
         printf("Attempting command: %s\n", cmd);
 
         output_line = 0;
         FILE *fp = popen(cmd, "r");
         while (fgets(output_buf[output_line], sizeof(output_buf[output_line]), fp) != NULL) { ++output_line; }
 
-
-        if(output_line == 10){
+        i=songbook->size;
+        reload_music_dir(songbook, playlist[1]);
+        if(songbook->size > i){
             printf("Command Succeeded\n");
-            flag_download_complete = 1;
-            flag_download_failed = 0;
-
-            reload_music_dir(songbook, playlist[1]);
+            flag_download_success = 1;
         }else{
-            flag_download_complete = 0;
-            flag_download_failed = 1;
+            flag_download_success = 0;
             printf("Command Failed\n");
         }
     }
@@ -439,9 +435,9 @@ void draw_download(Font* font, AllSongs* songbook, Playlist* playlist[MAX_PLAYLI
         DrawTextEx(*font, output_buf[i], (Vector2){search_bar.x-120, search_bar.y + y_offset}, 15, 1, DARKGRAY);
         y_offset += 20;
     }
-    if(flag_download_complete){
+    if(flag_download_success == 1){
         DrawTextEx(*font, "Download Complete", (Vector2){search_bar.x+95, search_bar.y+50}, 20, 1, GRAY);
-    }else if(flag_download_failed){
+    }else if(flag_download_success == 0){
         DrawTextEx(*font, "Download Failed", (Vector2){search_bar.x+110, search_bar.y+50}, 20, 1, GRAY);
     }
 }

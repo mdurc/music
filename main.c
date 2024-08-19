@@ -147,7 +147,7 @@ void load_songs_from_directory( const char* dir_path, AllSongs* songbook,
 
 void reload_music_dir(AllSongs* songbook, Playlist* all_songs){
     printf("SONG COUNT: %d\n", songbook->size);
-    load_songs_from_directory("music/", songbook, &engine, all_songs);
+    load_songs_from_directory(MUSIC_DIR, songbook, &engine, all_songs);
     printf("NEW SONG COUNT: %d\n", songbook->size);
 }
 
@@ -206,7 +206,7 @@ void handle_arrows(Vector2 mouse_pos, Vector2 text_size, Vector2 left_arrow_pos,
 
 void save_data(Playlist* playlists[MAX_PLAYLISTS]) {
     int i, j;
-    FILE *file = fopen("playlists.txt", "w");
+    FILE *file = fopen(PLAYLIST_FILE, "w");
     if (file == NULL) {
         perror("Failed to open file for writing");
         return;
@@ -247,7 +247,7 @@ void clean_playlists(Playlist* playlists[MAX_PLAYLISTS], AllSongs* songbook){
 }
 
 void load_data(Playlist* playlists[MAX_PLAYLISTS]) {
-    FILE *file = fopen("playlists.txt", "r");
+    FILE *file = fopen(PLAYLIST_FILE, "r");
     if (file == NULL) {
         perror("Failed to open file for reading");
         return;
